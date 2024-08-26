@@ -1,0 +1,13 @@
+Esse pacote é instalado no BI, mas não faz parte da versão do BI instalada nos clientes, então foi separado.
+Para utilização no BI é necessário:
+	- Criar as tabelas
+	- instalar a package no BI 
+	- Ativar a VAR_CONTEUDO AGENTE
+
+
+- Tentar separar tirar do BI
+	fcl.float_menu 
+	fcl.fakelistoptions   -> fakelistoptions_ctb
+
+Packages do BI que chamam essa package
+	- SCH - sch.execute_now('ctb.exec_schdl', 'N');
