@@ -19,8 +19,6 @@ procedure request_begin (  p_id_cliente     varchar2 default null,
 
 	BEGIN
 
-insert into err_txt values ('b1');
-commit; 
           if  substr(p_versao,1,1) <> '0' then
                begin
                     select URL into ws_url
@@ -53,8 +51,6 @@ commit;
                end if;
           end if;
 
-insert into err_txt values ('b2');
-commit; 
 
           begin
                ws_chave_final := '';
@@ -93,9 +89,6 @@ commit;
                     raise ws_gera_check;
         end;
 
-insert into err_txt values ('b3');
-commit; 
-
         begin
              update CTB_CLIENTES set CTB_CLIENTES.check_id      = ws_chave_final,
                                      CTB_CLIENTES.dt_ultima_com = sysdate
@@ -108,9 +101,6 @@ commit;
                      rollback;
                      raise ws_nocheck;        
         end;
-
-insert into err_txt values ('b4: '||ws_chave_final);
-commit; 
 
         htp.p(ws_chave_final);
 
@@ -143,9 +133,6 @@ procedure request_end (  p_id_cliente     varchar2 default null,
         ws_nocheck          exception;
 
 	begin		
-
-insert into err_txt values ('d1');
-commit; 
 
         if  not chk_cliente(p_id_cliente,p_check_id) then
             raise ws_nocheck;
@@ -210,9 +197,6 @@ procedure acao_end (      p_id_cliente      varchar2 default null,
 
 	begin
 
-insert into err_txt values ('d2');
-commit; 
-
         if  not chk_cliente(p_id_cliente,p_check_id) then
             ws_fase := 'CHECK_ID:';
             raise ws_nocheck;
@@ -273,15 +257,9 @@ procedure request_con (  p_id_cliente     varchar2 default null,
 
 	begin
 
-insert into err_txt values ('a1');
-commit;
         if  not chk_cliente(p_id_cliente,p_check_id) then
-insert into err_txt values ('a2');        
-commit;
             raise ws_nocheck;
         end if;
-insert into err_txt values ('a3');
-commit;
         begin
              select count(*) into ws_check
              from   CTB_REGISTRO
@@ -298,8 +276,6 @@ commit;
 		for i in (select ID_CONEXAO, CD_PARAMETRO, CONTEUDO from CTB_CONEXOES where ID_CLIENTE = p_id_cliente) loop
               htp.p(i.ID_CONEXAO||'|'||i.CD_PARAMETRO||'|'||i.CONTEUDO||'|');
 		end loop;
-insert into err_txt values ('a4');
-commit;
 
     exception
          when others
@@ -320,8 +296,6 @@ procedure request_list (  p_id_cliente     varchar2 default null,
         ws_nocheck          exception;
 
 	begin
-insert into err_txt values ('c1');
-commit; 
         if  not chk_cliente(p_id_cliente,p_check_id) then
             raise ws_nocheck;
         end if;
@@ -367,8 +341,6 @@ procedure request_acao (  p_id_cliente     varchar2 default null,
      ws_erro_in          exception;
 
 begin
-insert into err_txt values ('c2');
-commit; 
 
      begin
           select agentc.b2c(comando) as comando, conteudo_envio, run_acao_id 
@@ -402,8 +374,6 @@ commit;
 exception
       when others then
            ws_conteudo_envio := sqlerrm;
-           insert into err_txt values ('EXECUTA-'||ws_conteudo_envio);
-           commit;
            raise ws_erro_in;
 end request_acao;
 
@@ -423,9 +393,6 @@ procedure put_error (p_id_cliente     varchar2 default null,
      ws_nocheck          exception;
 
 begin
-
-insert into err_txt values ('d4');
-commit; 
 
      if  not chk_cliente(p_id_cliente,p_check_id) then
           raise ws_nocheck;
@@ -501,9 +468,6 @@ function chk_cliente ( p_id_cliente     varchar2,
 
 begin
 
-insert into err_txt values ('c3');
-commit; 
-
         ws_retorno := true;
 
         begin
@@ -542,8 +506,6 @@ procedure upload ( p_documento      IN  varchar2 default null,
      ws_dt_aux           date;   
 
 begin
-insert into err_txt values ('d3');
-commit; 
 
      ws_sysdate := sysdate; 
      ws_status  := 'WAITING'; 
@@ -581,30 +543,22 @@ commit;
      htp.p('OK=['||p_id_acao||']');
 
 exception
-     when others
-          then
-               insert into err_txt values (TO_CHAR(SYSDATE,'YYYYMMDD HH24:MI:SS')||' - AGENTC Body[3] - UPLOAD - '||DBMS_UTILITY.FORMAT_ERROR_STACK||' - '||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-               commit;
---                  ws_check := 1/0;
+     when others then
+          insert into err_txt values (TO_CHAR(SYSDATE,'YYYYMMDD HH24:MI:SS')||' - AGENTC Body[3] - UPLOAD - '||DBMS_UTILITY.FORMAT_ERROR_STACK||' - '||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+          commit;
 
 end upload;
 
 procedure uptest ( p_documento      IN  varchar2 default null ) as
 
-        l_nome_real         varchar2(1000);
-        ws_check            number;
-        ws_nocheck          exception;
-
+     l_nome_real         varchar2(1000);
+     ws_check            number;
+     ws_nocheck          exception;
 begin
-
-insert into err_txt values ('up1');
-commit;
-
         htp.p('OK=['||']');
---        insert into err_txt values (TO_CHAR(SYSDATE,'YYYYMMDD HH24:MI:SS')||' - AGENTC Body[4] - VERIFICA CHECK=['||p_id_cliente||']-['||p_check_id||']-['||p_id_acao||']');
---        commit;
-
 end uptest;
+
+
 
 procedure error_domweb (
                         p_id_cliente      varchar2 DEFAULT NULL,
@@ -624,9 +578,6 @@ procedure error_domweb (
   ws_command      varchar2(30);
 
 begin
-
-insert into err_txt values ('d4');
-commit; 
 
    ws_command := 'OK';
 
@@ -665,9 +616,6 @@ procedure atu_status_acao ( prm_run_acao_id   number,
      ws_dh_i   date := null;
      ws_dh_f   date := null; 
 begin
-
-insert into err_txt values ('d5');
-commit; 
 
      if prm_status in ('EXECUTANDO','AGUARDANDO') then 
           ws_dh_i :=  sysdate; 

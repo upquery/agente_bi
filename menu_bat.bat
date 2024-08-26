@@ -1,2 +1,2 @@
-cmd /c atu_tudo.bat DWU2 DWU2 DESENV_PDB
+cmd /c atu_tudo.bat DWU 4wdyPel2SX49 DESENV_PDB
 
