@@ -17,7 +17,13 @@ function vpipe ( prm_entrada varchar2,
 
 ---------------------------------------------------------------------------------------------------------
 
-
+procedure ctb_fakelistoptions ( prm_ident     varchar2 default null,
+								prm_campo     varchar2 default null,
+								prm_visao     varchar2 default null,
+								prm_ref       varchar2 default null,
+								prm_adicional varchar2 default null,
+								prm_search    varchar2 default null,
+								prm_obj		  varchar2 default null );
 procedure exec_schdl;
 
 procedure exec_run (prm_run_id             varchar2,
@@ -42,7 +48,10 @@ procedure ctb_atu_status_run ( prm_run_id      varchar2,
 
 function ctb_clie_usua_get (prm_usuario varchar2) return varchar2 ;
 
-procedure ctb_clie_usua_atu (prm_usuario varchar2 default null, prm_id_cliente varchar2) ;
+procedure ctb_usua_clie_sel (prm_usuario varchar2 default null, prm_clientes varchar2) ;
+
+procedure ctb_usua_clie_lista (prm_usuario   varchar2 default null,
+							   prm_proc_tela varchar2 default null);
 
 function prn_a_status  (prm_status varchar2) return varchar2 ; 
 
@@ -55,7 +64,7 @@ procedure ctb_conexoes_valida (prm_acao           varchar2,
                                prm_conteudo       varchar2,
 							   prm_retorno    out varchar2 ) ; 
 
-procedure ctb_conexoes_list (prm_id_cliente  varchar2 default null) ;
+procedure ctb_conexoes_list  ;
 
 procedure ctb_conexoes_insert ( prm_parametros    varchar2, 
 							    prm_conteudos     varchar2 ) ; 
@@ -74,10 +83,10 @@ procedure ctb_acoes_list (prm_id_cliente   varchar2 default null,
 						  prm_dir          varchar2 default '1') ; 
 
 procedure ctb_acoes_insert (prm_id_cliente       varchar2,
-							prm_ds_acao          varchar2, 
-                            prm_id_conexao       varchar2,
-						    prm_tabela_criterio  varchar2,
-						    prm_tabela_transp    varchar2,
+							prm_id_acao          varchar2, 
+							prm_id_conexao       varchar2,
+						    prm_tipo_comando     varchar2,
+						    prm_tbl_destino      varchar2,
 						    prm_id_copia         varchar2 default null); 
 
 procedure ctb_acoes_update (prm_id_acao       varchar2, 
@@ -98,8 +107,7 @@ procedure tmp_docs_list (prm_id_cliente   varchar2,
                          prm_id_acao      varchar2,
 					     prm_linhas	      varchar2 default '50') ; 
 
-procedure ctb_run_list (prm_id_cliente  varchar2 default null, 
-                        prm_order       varchar2 default '2', 
+procedure ctb_run_list (prm_order       varchar2 default '2', 
                         prm_dir         varchar2 default '1') ;
 procedure ctb_run_insert (prm_id_cliente  varchar2, 
                           prm_ds_run      varchar2) ; 

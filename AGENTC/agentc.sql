@@ -313,7 +313,7 @@ procedure request_list (  p_id_cliente     varchar2 default null,
                   raise ws_nocheck;
         end;
 
-		for i in (select ID_CONEXAO, ID_ACAO, DS_ACAO, ST_BYPASS, CONTEUDO_ENVIO from CTB_ACOES_EXEC where ID_CLIENTE = p_id_cliente and STATUS in ('STANDBY','RUNNING')
+		for i in (select ID_CONEXAO, ID_ACAO, DS_ACAO, NULL ST_BYPASS, NULL CONTEUDO_ENVIO from CTB_ACOES_EXEC where ID_CLIENTE = p_id_cliente and STATUS in ('STANDBY','RUNNING')
         ) loop
               htp.p(i.ID_ACAO||'|'||i.ID_CONEXAO||'|'||i.DS_ACAO||'|'||i.ST_BYPASS||'|'||I.CONTEUDO_ENVIO);
 		end loop;

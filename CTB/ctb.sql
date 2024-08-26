@@ -185,6 +185,95 @@ begin
 	return '<a class="'||ws_classe||'" style="background: '||ws_cor||' !important;" title="'||ws_hint||'" >'||ws_status||'</a>'; 
 end;  
 
+-----Criado procedure nessa package reduzir código referente ao agente dentro do BI --------------------------------------------------------------------------------------------------------------------------------------------------------
+procedure ctb_fakelistoptions ( prm_ident     varchar2 default null,
+								prm_campo     varchar2 default null,
+								prm_visao     varchar2 default null,
+								prm_ref       varchar2 default null,
+								prm_adicional varchar2 default null,
+								prm_search    varchar2 default null,
+								prm_obj		  varchar2 default null ) as
+
+	ws_usuario  varchar2(100); 
+
+	procedure nested_test_list ( prm_ref     varchar2 default null,
+								prm_id      varchar2 default null,
+								prm_nome    varchar2 default null,
+								prm_fixo    varchar2 default null,
+								prm_cod     varchar2 default null,
+								prm_com_cod varchar2 default 'S',
+								prm_class   varchar2 default '') as
+	ws_count  number;
+	ws_rotulo varchar2(200);
+	ws_class  varchar2(100); 
+	begin
+		select count(*) into ws_count from table((fun.vpipe(prm_ref))) where '|'||trim(column_value)||'|' = '|'||trim(prm_id)||'|';
+		ws_rotulo := prm_nome;
+
+		if nvl(prm_fixo, 'N/A') <> 'N/A' then
+			ws_rotulo := prm_fixo;
+		else
+			if prm_id <> prm_nome and nvl(prm_com_cod,'S') = 'S' and prm_id not in ('TODOS','NENHUM') then
+				ws_rotulo := nvl(prm_cod, prm_id)||' - '||prm_nome;
+			end if;
+		end if;
+		ws_class := prm_class;
+		if ws_count > 0 then
+			ws_class := ws_class||' selected';
+		end if; 
+		htp.p('<li title="'||prm_id||'" class="opt '||ws_class||'">'||ws_rotulo||'</li>');
+	end nested_test_list;
+
+begin
+	
+	ws_usuario := gbl.getusuario(); 
+
+	case
+		when prm_campo = 'lista-ctb-tipo-db' then
+			for i in ( select cd_item as cod, fun.lang(nvl(ds_abrev, ds_item)) as nome from bi_lista_padrao where cd_lista = 'CTB_TIPO_BANCO' order by nr_ordem, cd_item) loop
+				nested_test_list(prm_ref, i.cod, i.nome);
+			end loop;
+
+		when prm_campo = 'lista-ctb-tipo-comando' then
+			for i in ( select cd_item as cod, fun.lang(nvl(ds_abrev, ds_item)) as nome from bi_lista_padrao where cd_lista = 'CTB_TIPO_COMANDO' order by nr_ordem, cd_item) loop
+				nested_test_list(prm_ref, i.cod, i.nome);
+			end loop;
+		when prm_campo = 'lista-ctb-sistemas' then
+			for i in ( select 1 ordem, cd_sistema, ds_sistema from ctb_sistemas order by 1,2) loop
+  				nested_test_list(prm_ref, i.cd_sistema, i.cd_sistema);
+			end loop;
+
+		when prm_campo = 'lista-ctb-clientes' then
+			for i in ( select 1 ordem, id_cliente, nm_cliente from ctb_clientes 
+			            where id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = ws_usuario )
+			           order by 1,2) loop
+  				nested_test_list(prm_ref, i.id_cliente, i.nm_cliente);
+			end loop;
+
+		when prm_campo = 'lista-ctb-conexao' then
+			for i in ( select distinct id_conexao from ctb_conexoes 
+			            where id_cliente = nvl(prm_adicional,id_cliente) 
+						  and id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = ws_usuario and id_selecionado = 'S') 
+					   order by 1)
+			loop
+  				nested_test_list(prm_ref, i.id_conexao, i.id_conexao);
+			end loop;
+		when prm_campo = 'lista-ctb-acoes' then
+			for i in ( select distinct id_acao from ctb_acoes 
+			            where id_cliente = nvl(prm_adicional, id_cliente) 
+						  and id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = ws_usuario and id_selecionado = 'S') 
+					   order by 1)
+			loop
+  				nested_test_list(prm_ref, i.id_acao, i.id_acao);
+			end loop;
+	end case;
+
+end ctb_fakelistoptions; 							
+
+
+
+
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure exec_schdl as 
 
@@ -271,7 +360,7 @@ procedure exec_run (prm_run_id             varchar2,
 
     cursor c_rs is
 		select ra.run_acao_id, ra.run_id, ra.ordem, ru.ds_run, 
-		       ac.id_cliente, ac.id_conexao, ac.id_acao, ac.ds_acao, ac.comando, ac.comando_limpar, ac.st_bypass, ac.tabela_transp, ac.tabela_criterio 
+		       ac.id_cliente, ac.id_conexao, ac.id_acao, ac.comando, ac.comando_limpar, ac.tbl_destino, ac.tipo_comando 
 		  from ctb_acoes ac, ctb_run ru, ctb_run_acoes ra
 	     where ac.id_cliente  = ru.id_cliente 
 		   and ac.id_acao     = ra.id_acao 
@@ -354,13 +443,13 @@ begin
 				ws_erro := nvl(ws_erro, ws_erro_limpar);
 			end if;	
 			ctb.ctb_atu_status_acao(a.run_acao_id, 'ERRO');
-			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   ds_acao,    comando,         comando_limpar,    tabela_transp,   tabela_criterio,   status,    dt_inicio, erro) 
-							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, a.ds_acao,  ws_comando_blob, ws_comando_limpar, a.tabela_transp, a.tabela_criterio, 'ERRO',    sysdate,   ws_erro );
+			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   comando,         comando_limpar,    tbl_destino,   status,    dt_inicio, erro) 
+							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, ws_comando_blob, ws_comando_limpar, a.tbl_destino, 'ERRO',    sysdate,   ws_erro );
 		else 	
 			ws_comando_blob := ctb.c2b(ws_comando);
 			ctb.ctb_atu_status_acao(a.run_acao_id, 'AGUARDANDO');
-			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   ds_acao,    comando,         comando_limpar,    tabela_transp,   tabela_criterio,   status,    dt_inicio) 
-							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, a.ds_acao,  ws_comando_blob, ws_comando_limpar, a.tabela_transp, a.tabela_criterio, 'STANDBY', sysdate);
+			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   comando,         comando_limpar,    tbl_destino,    status,    dt_inicio) 
+							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, ws_comando_blob, ws_comando_limpar, a.tbl_destino, 'STANDBY', sysdate);
     	end if;     
 	end loop; 	
 
@@ -586,30 +675,49 @@ end ctb_atu_status_run;
 ---- procedures de TELAS do BI ---------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-
 function ctb_clie_usua_get (prm_usuario varchar2) return varchar2 as  
-    ws_return varchar2(500) := null;
+    ws_return varchar2(4000) := null;
 begin
-  select nvl(codigo_cliente,'TODOS') into ws_return from ctb_cliente_usuario where usuario = prm_usuario and rownum = 1 ;
-  return ws_return;   
+	select listagg(id_cliente,'|') within group (order by id_cliente) into ws_return from ctb_usuario_cliente where cd_usuario = prm_usuario and id_selecionado = 'S';
+	return ws_return;   
 exception when others then
     return 'TODOS'; 
 end ctb_clie_usua_get;
 
-
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-procedure ctb_clie_usua_atu (prm_usuario varchar2 default null, prm_id_cliente varchar2) as 
+procedure ctb_usua_clie_sel (prm_usuario varchar2 default null, prm_clientes varchar2) as 
     ws_usuario varchar2(100);
 begin 
+insert into err_txt values ('a1:'||prm_usuario||'-'||prm_clientes);
+commit; 
     ws_usuario := nvl(prm_usuario, gbl.getusuario()); 
-    update ctb_cliente_usuario 
-       set codigo_cliente = prm_id_cliente 
-     where usuario = ws_usuario ;
-    if sql%notfound then 
-        insert into ctb_cliente_usuario (usuario, codigo_cliente) values (ws_usuario, prm_id_cliente);
-    end if;    
+    update ctb_usuario_cliente set id_selecionado = 'N'  
+     where cd_usuario = ws_usuario ;
+	for a in (select column_value as id_cliente from table(fun.vpipe(prm_clientes))) loop 
+    	update ctb_usuario_cliente set id_selecionado = 'S'
+         where cd_usuario = ws_usuario 
+		   and id_cliente = a.id_cliente;
+	end loop;	   
     commit; 
-end ctb_clie_usua_atu; 
+end ctb_usua_clie_sel; 
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+procedure ctb_usua_clie_lista (prm_usuario   varchar2 default null,
+							   prm_proc_tela varchar2 default null) as 
+	ws_clientes  varchar2(20);   
+	ws_nm_clientes varchar2(32000);
+begin 
+    ws_clientes := ctb.ctb_clie_usua_get(prm_usuario);    
+	select listagg(id_cliente||'-'||nm_cliente,',') within group (order by nm_cliente) into ws_nm_clientes from ctb_clientes 
+	 where id_cliente in (select column_value from table(fun.vpipe(ws_clientes)));
+	htp.p('<div class="searchbar">');
+        htp.p('<a class="ctb-selecao-cliente">CLIENTE : </a>');
+        htp.p('<a class="script" onclick="call(''ctb_usua_clie_sel'', ''prm_clientes=''+this.nextElementSibling.title, ''ctb''); ajax(''list'', '''||prm_proc_tela||''',  '''', true, ''content'','''','''',''CTB'');"></a>');
+		fcl.fakeoption('prm_id_cliente', '', ws_clientes, 'lista-ctb-clientes', 'N', 'N', prm_encode => 'S', prm_desc => ws_nm_clientes, prm_min => 1 );
+	htp.p('</div>');
+end ctb_usua_clie_lista; 
+
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure menu_ctb (prm_menu      varchar2, 
@@ -623,7 +731,7 @@ procedure menu_ctb (prm_menu      varchar2,
 	ws_onkeypress_pipe varchar2(500); 
 	ws_param           varchar2(4000); 
 	ws_title           varchar2(300); 
-	ws_tabela_criterio varchar2(200);
+	ws_tipo_comando varchar2(200);
 	ws_desc            varchar2(400);
     ws_usuario         varchar2(100);
 
@@ -675,20 +783,20 @@ begin
 			--htp.p('<input type="hidden"   id="prm_id_conexao"     values="'||ws_acoes.id_conexao||'">');	 
 		end if; 	
 		
-		ws_tabela_criterio := null;
+		ws_tipo_comando := null;
 		if prm_id_copia is not null then 
-			ws_tabela_criterio := ws_acoes.tabela_criterio;
+			ws_tipo_comando := ws_acoes.tipo_comando;
 		end if; 
 		
-		htp.p('<span class="script" onclick="let vid = ''''; if (document.getElementById(''prm_tabela_criterio'').title==''FULL''){vid=''ETL_TAUX_'';}else{vid=''ETL_V_'';}; document.getElementById(''prm_ds_acao'').value=vid; document.getElementById(''prm_tabela_transp'').value=vid; "></span>');
-		fcl.fakeoption('prm_tabela_criterio', fun.lang('TIPO COMANDO'), ws_tabela_criterio, 'lista-ctb-tipo-comando', 'N', 'N', null);				
+		htp.p('<span class="script" onclick="let vid = ''''; if (document.getElementById(''prm_tipo_comando'').title==''FULL''){vid=''ETL_TAUX_'';}else{vid=''ETL_V_'';}; document.getElementById(''prm_id_acao'').value=vid; document.getElementById(''prm_tbl_destino'').value=vid; "></span>');
+		fcl.fakeoption('prm_tipo_comando', fun.lang('TIPO COMANDO'), ws_tipo_comando, 'lista-ctb-tipo-comando', 'N', 'N', null);				
 
-		htp.p('<input type="text"   id="prm_ds_acao"   data-min="1" data-encode="N" placeholder="'||fun.lang('DESCR. A&Ccedil;&Atilde;O')||'" class="up" '||ws_onkeypress_pipe||
-			'onchange="document.getElementById(''prm_tabela_transp'').value = document.getElementById(''prm_ds_acao'').value.toUpperCase()"  value="'||ws_acoes.ds_acao||'" />');
-		htp.p('<input type="text"   id="prm_tabela_transp"    data-min="1" data-encode="S" placeholder="'||fun.lang('TABELA DE DESTINO') ||'" '||ws_onkeypress_cod||' value="'||ws_acoes.tabela_transp||'">');	
+		htp.p('<input type="text"   id="prm_id_acao"   data-min="1" data-encode="N" placeholder="'||fun.lang('ID A&Ccedil;&Atilde;O')||'" class="up" '||ws_onkeypress_pipe||
+			'onchange="document.getElementById(''prm_tbl_destino'').value = document.getElementById(''prm_id_acao'').value.toUpperCase()"  value="'||ws_acoes.id_acao||'" />');
+		htp.p('<input type="text"   id="prm_tbl_destino"    data-min="1" data-encode="S" placeholder="'||fun.lang('TABELA DE DESTINO') ||'" '||ws_onkeypress_cod||' value="'||ws_acoes.tbl_destino||'">');	
 
 		htp.p('<a class="addpurple followed" title="'||fun.lang('Adicionar A&ccedil;&atilde;o')||'" data-sup="ctb_acoes"'||  
-				'data-req="ctb_acoes_insert" data-par="prm_id_cliente|prm_ds_acao|prm_id_conexao|prm_tabela_criterio|prm_tabela_transp|prm_id_copia" '||
+				'data-req="ctb_acoes_insert" data-par="prm_id_cliente|prm_id_acao|prm_id_conexao|prm_tipo_comando|prm_tbl_destino|prm_id_copia" '||
 				'data-res="ctb_acoes_list" data-msg="'||fun.lang('Adicionado com sucesso')||'" data-pkg="ctb">'||fun.lang('ADICIONAR')||'</a>');
 
 	when prm_menu = 'ctb_run' then 	
@@ -789,8 +897,7 @@ end ctb_conexoes_valida;
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-procedure ctb_conexoes_list (prm_id_cliente  varchar2 default null) as 
-    ws_id_cliente   varchar2(50);
+procedure ctb_conexoes_list as 
     ws_nm_cliente   varchar2(200);
 	ws_conteudo     varchar2(4000); 	
     ws_eventoGravar varchar2(2000);
@@ -800,13 +907,7 @@ begin
     ws_eventoGravar := ' "requestDefault(''ctb_conexoes_update'', ''prm_id_cliente=#CLIENTE#&prm_id_conexao=#CONEXAO#&prm_cd_parametro=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB'');"'; 
     htp.p('<input type="hidden" id="content-atributos" data-refresh="ctb_conexoes_list" data-pkg="ctb" >');
 
-    ws_id_cliente   := nvl(prm_id_cliente, ctb.ctb_clie_usua_get(gbl.getusuario()));    
-    select nvl(max(nm_cliente),'TODOS') into ws_nm_cliente from ctb_clientes where id_cliente = ws_id_cliente;
-	htp.p('<div class="searchbar">');
-        htp.p('<a class="ctb-selecao-cliente">CLIENTE : </a>');
-        htp.p('<a class="script" onclick="call(''ctb_clie_usua_atu'', ''prm_id_cliente=''+this.nextElementSibling.title, ''ctb''); ajax(''list'', ''ctb_conexoes_list'',  ''prm_id_cliente=''+this.nextElementSibling.title, true, ''content'','''','''',''CTB'');"></a>');
-		fcl.fakeoption('prm_id_cliente', '', ws_id_cliente, 'lista-ctb-clientes', 'N', 'N', prm_desc => ws_id_cliente||' - '||ws_nm_cliente );
-	htp.p('</div>');
+    ctb.ctb_usua_clie_lista(gbl.getusuario(), 'ctb_conexoes_list');
 
     htp.p('<table class="linha">');
         htp.p('<thead>');
@@ -823,7 +924,7 @@ begin
         for a in (select distinct con.id_cliente, cli.nm_cliente, con.id_conexao  
                     from ctb_clientes cli, ctb_conexoes con 
                    where cli.id_cliente = con.id_cliente 
-                     and con.id_cliente = decode(ws_id_cliente,'TODOS',cli.id_cliente, ws_id_cliente)
+                     and con.id_cliente in (select id_cliente from ctb_usuario_cliente where id_selecionado = 'S')
                    order by con.id_cliente, con.id_conexao) loop 	
             ws_evento := ws_eventoGravar;
             ws_evento := replace(ws_evento,'#CLIENTE#', a.id_cliente);
@@ -883,6 +984,8 @@ procedure ctb_conexoes_insert ( prm_parametros    varchar2,
 	raise_erro  exception;
 begin 
 
+insert into err_txt values ('a1:'||prm_conteudos);
+commit; 
 	ws_usuario := gbl.getusuario(); 
 
     -- Grava todos os conteudos em um array 
@@ -902,8 +1005,13 @@ begin
 		
 		if a.cd_parametro = 'ID_CLIENTE' then 
 			ws_id_cliente := ws_conteudo;
+			if ws_id_cliente like '%@PIPE@%' then 
+				ws_erro := 'Para adicionar, deve ser selecionado apenas um cliente na lista de CLIENTES';
+				raise raise_erro;
+			end if; 
             if length(ws_conteudo) = 0 or ws_conteudo is null then 
-                ws_id_cliente := ctb.ctb_clie_usua_get (ws_usuario);
+				ws_erro := 'Para adicionar, deve &eacute; necess&aacute;rio selecionar um cliente na lista de CLIENTES';
+				raise raise_erro;
             end if; 
             ws_conteudo := ws_id_cliente;
 		elsif a.cd_parametro = 'ID_CONEXAO' then 
@@ -1018,15 +1126,16 @@ procedure ctb_acoes_list (prm_id_cliente   varchar2 default null,
 						  prm_dir          varchar2 default '1') as 
 	
 	ws_id_cliente      varchar2(50);
+	ws_usuario         varchar2(100);
 
 	cursor c1 is 
-		select ac.id_cliente, cl.nm_cliente, id_acao, id_conexao, ds_acao, tabela_criterio, comando, comando_limpar, tabela_transp 
+		select ac.id_cliente, cl.nm_cliente, id_acao, id_conexao, tipo_comando, comando, comando_limpar, tbl_destino
           from ctb_clientes cl, ctb_acoes ac 
 		 where cl.id_cliente = ac.id_cliente
-		   and ac.id_cliente = decode(ws_id_cliente, 'TODOS', ac.id_cliente, ws_id_cliente) 
+		   and ac.id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = ws_usuario and id_selecionado = 'S' ) 
            and id_acao       = nvl(prm_id_acao, id_acao)
-		  order by case when prm_dir = '1' then decode(prm_order, '1', cl.id_cliente, '2', id_acao, '3', ds_acao, '4', tabela_criterio, '5', comando, '6', comando_limpar, '7', id_conexao, '8', tabela_transp, id_acao) end asc,
-		           case when prm_dir = '2' then decode(prm_order, '1', cl.id_cliente, '2', id_acao, '3', ds_acao, '4', tabela_criterio, '5', comando, '6', comando_limpar, '7', id_conexao, '8', tabela_transp, id_acao) end desc; 
+		  order by case when prm_dir = '1' then decode(prm_order, '1', cl.id_cliente, '2', id_acao, '3', tipo_comando, '4', comando, '5', comando_limpar, '6', id_conexao, '7', tbl_destino, id_acao) end asc,
+		           case when prm_dir = '2' then decode(prm_order, '1', cl.id_cliente, '2', id_acao, '3', tipo_comando, '4', comando, '5', comando_limpar, '6', id_conexao, '7', tbl_destino, id_acao) end desc; 
 
 	ws_onkeypress      varchar2(300); 
 	ws_onkeypress_int  varchar2(300); 
@@ -1040,6 +1149,7 @@ procedure ctb_acoes_list (prm_id_cliente   varchar2 default null,
 	ws_comando_l       clob; 
 
 begin 
+	ws_usuario        := gbl.getusuario();
 	ws_onkeypress     := ' onkeypress="proxCampo(event,this);"'; 
 	ws_onkeypress_int := ' onkeypress="if(!input(event, ''integer'')) {event.preventDefault();} "';
 	ws_eventoGravar   := ' "requestDefault(''ctb_acoes_update'', ''prm_id_acao=#ID#&prm_cd_parametro=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB'');"'; 
@@ -1048,13 +1158,7 @@ begin
 	htp.p('<input type="hidden" id="content-atributos" data-pkg="ctb" data-par-col="prm_id_acao" data-par-val="'||prm_id_acao||'" >');
 	htp.p('<input type="hidden" id="prm_id_acao" value="'||prm_id_acao||'">');	
 
-    ws_id_cliente   := nvl(prm_id_cliente, ctb.ctb_clie_usua_get(gbl.getusuario()));    
-    select nvl(max(nm_cliente),'TODOS') into ws_nm_cliente from ctb_clientes where id_cliente = ws_id_cliente;
-	htp.p('<div class="searchbar">');
-        htp.p('<a class="ctb-selecao-cliente">CLIENTE : </a>');
-        htp.p('<a class="script" onclick="call(''ctb_clie_usua_atu'', ''prm_id_cliente=''+this.nextElementSibling.title, ''ctb''); ajax(''list'', ''ctb_acoes_list'',  ''prm_id_cliente=''+this.nextElementSibling.title, true, ''content'','''','''',''CTB'');"></a>');
-		fcl.fakeoption('prm_id_cliente', '', ws_id_cliente, 'lista-ctb-clientes', 'N', 'N', prm_desc => ws_id_cliente||' - '||ws_nm_cliente );
-	htp.p('</div>');
+	ctb.ctb_usua_clie_lista(ws_usuario, 'ctb_acoes_list');
 
 	htp.p('<table class="linha">');
 		htp.p('<thead>');
@@ -1065,23 +1169,20 @@ begin
 				htp.p('<th title="ID da a&ccedil;&atilde;o">');  
 					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',2)||'>'||fun.lang('ID A&Ccedil;&Atilde;O')||'</a>');
 				htp.p('</th>');
-				htp.p('<th title="Descri&ccedil;&atilde;o da a&ccedil;&atilde;o">');  
-					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',3)||'>'||fun.lang('DESCR. A&Ccedil;&Atilde;O')||'</a>');
-				htp.p('</th>');
 				htp.p('<th title="Tipo de comando" style="width:40px;">');
-					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',4)||'>'||fun.lang('TP COM')||'</a>');
+					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',3)||'>'||fun.lang('TP COM')||'</a>');
 				htp.p('</th>');
 				htp.p('<th title="Comando de extra&ccedil;&atilde;o dos dados">');				
-					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',5)||'>'||fun.lang('COMANDO')||'</a>');
+					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',4)||'>'||fun.lang('COMANDO')||'</a>');
 				htp.p('</th>');
 				htp.p('<th title="Comando de limpeza da tabela de destino">');
-					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',6)||'>'||fun.lang('COMANDO LIMPEZA')||'</a>');
+					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',5)||'>'||fun.lang('COMANDO LIMPEZA')||'</a>');
 				htp.p('</th>');
 				htp.p('<th title="Conex&atilde;o Utilizada">');
-					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',7)||'>'||fun.lang('CONEX&Atilde;O')||'</a>');
+					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',6)||'>'||fun.lang('CONEX&Atilde;O')||'</a>');
 				htp.p('</th>');
 				htp.p('<th title="Tabela atualizada no BI">');
-					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',8)||'>'||fun.lang('TABELA DESTINO')||'</a>');
+					htp.p('<a class="red" onclick='||replace(ws_eventoOrdem,'#ORDEM#',7)||'>'||fun.lang('TABELA DESTINO')||'</a>');
 				htp.p('</th>');
 				htp.p('<th></th>');
 				htp.p('<th></th>');
@@ -1101,14 +1202,13 @@ begin
 					
                     htp.p('<td>'||a.id_cliente||'-'||a.nm_cliente||'</td>');
                     htp.p('<td>'||a.id_acao||'</td>');
-					htp.p('<td><input id="prm_ds_acao_'||a.id_acao||'" type="text" data-min="1" data-default="'||a.ds_acao ||'" onblur='||replace(replace(ws_evento,'#CAMPO#','DS_ACAO'),   '#VALOR#','this.value')||' value="'||a.ds_acao||'" /></td>');
 	
 					ws_comando := fun.html_trans(a.comando);
 					ws_comando_l := replace(fun.html_trans(a.comando_limpar),chr(10),'<br>');
 
 					htp.p('<td>');
-						htp.p('<a class="script" data-default="'||a.tabela_criterio||'" onclick='||replace(replace(ws_evento,'#CAMPO#','TABELA_CRITERIO'),'#VALOR#','this.nextElementSibling.title')||'></a>');
-						fcl.fakeoption('prm_tabela_criterio_'||a.id_acao, fun.lang('Tipo Comando'), a.tabela_criterio, 'lista-ctb-tipo-comando', 'N', 'N', null, prm_min => 1, prm_desc => fun.lang(a.tabela_criterio) );
+						htp.p('<a class="script" data-default="'||a.tipo_comando||'" onclick='||replace(replace(ws_evento,'#CAMPO#','TIPO_COMANDO'),'#VALOR#','this.nextElementSibling.title')||'></a>');
+						fcl.fakeoption('prm_tipo_comando_'||a.id_acao, fun.lang('Tipo Comando'), a.tipo_comando, 'lista-ctb-tipo-comando', 'N', 'N', null, prm_min => 1, prm_desc => fun.lang(a.tipo_comando) );
 					htp.p('</td>');
 
 					htp.p('<td title="'||ws_comando||'" class="ctb_modal_comando" style="cursor: pointer;">');
@@ -1124,7 +1224,7 @@ begin
 						fcl.fakeoption('prm_id_conexao_'||a.id_acao, fun.lang('Conex&atilde;o'), a.id_conexao, 'lista-ctb-conexao', 'N', 'N', null, prm_min => 1, prm_adicional => a.id_cliente);
 					htp.p('</td>');
 
-					htp.p('<td><input id="prm_tabela_transp_'||a.id_acao||'" type="text" data-min="1" data-default="'||a.tabela_transp ||'" onblur='||replace(replace(ws_evento,'#CAMPO#','TABELA_TRANSP'),   '#VALOR#','this.value')||' value="'||a.tabela_transp||'" /></td>');
+					htp.p('<td><input id="prm_tbl_destino_'||a.id_acao||'" type="text" data-min="1" data-default="'||a.tbl_destino ||'" onblur='||replace(replace(ws_evento,'#CAMPO#','TBL_DESTINO'),   '#VALOR#','this.value')||' value="'||a.tbl_destino||'" /></td>');
 
 					htp.p('<td class="ctb_atalho" title="Log de execu&ccedil;&atilde;o do agente." '||
 					      ' onclick="carregaTelasup(''ctb_acoes_exec_list'', ''prm_tp=ACAO&prm_id='||a.id_acao||''', ''CTB'', ''none'','''','''',''ctb_acoes_list|prm_id_cliente='||a.id_cliente||'&prm_id_acao='||prm_id_acao||'|CTB|ctb_acoes|||'');">');
@@ -1145,7 +1245,7 @@ begin
 					end if; 
 
 					htp.p('<td>');
-						fcl.button_lixo('ctb_acoes_delete','prm_id_acao', a.id_acao, prm_tag => 'a', prm_pkg => 'CTB');
+						fcl.button_lixo('ctb_acoes_delete','prm_id_cliente|prm_id_acao', a.id_cliente||'|'||a.id_acao, prm_tag => 'a', prm_pkg => 'CTB');
 					htp.p('</td>');
 				htp.p('</tr>');						
 			end loop; 	
@@ -1159,69 +1259,54 @@ end ctb_acoes_list;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure ctb_acoes_insert (prm_id_cliente       varchar2,
-							prm_ds_acao          varchar2, 
+							prm_id_acao          varchar2, 
 							prm_id_conexao       varchar2,
-						    prm_tabela_criterio  varchar2,
-						    prm_tabela_transp    varchar2,
+						    prm_tipo_comando     varchar2,
+						    prm_tbl_destino      varchar2,
 						    prm_id_copia         varchar2 default null) as 
 
 	ws_run_id   		 number; 
 	ws_count 		     integer; 
 	ws_erro     		 varchar2(300); 
 
-	ws_id_acao           ctb_acoes.id_acao%type;
-	ws_tabela_criterio   ctb_acoes.tabela_criterio%type;
-	ws_id_conexao        ctb_acoes.id_conexao%type;
-	ws_tabela_transp     ctb_acoes.tabela_transp%type;
-	ws_comando           ctb_acoes.comando%type;
-	ws_comando_limpar    ctb_acoes.comando_limpar%type;
+	ws_tipo_comando    ctb_acoes.tipo_comando%type;
+	ws_id_conexao      ctb_acoes.id_conexao%type;
+	ws_tbl_destino     ctb_acoes.tbl_destino%type;
+	ws_comando         ctb_acoes.comando%type;
+	ws_comando_limpar  ctb_acoes.comando_limpar%type;
 	ws_raise_erro  exception;
 begin 
-	if prm_ds_acao is null then 
-		ws_erro := 'Descri&ccedil;&atilde;o da a&ccedil;&atilde;o deve ser preenchida';
+	if prm_id_acao is null then 
+		ws_erro := 'C&oacute;digo identificador da a&ccedil;&atilde;o deve ser preenchido';
 		raise ws_raise_erro; 
 	end if; 
 
-	select count(*) into ws_count from ctb_acoes where id_cliente = prm_id_cliente and trim(upper(ds_acao)) = trim(upper(prm_ds_acao)) ; 
+	select count(*) into ws_count from ctb_acoes where id_cliente = prm_id_cliente and trim(upper(id_acao)) = trim(upper(prm_id_acao)) ; 
 	if ws_count > 0 then 
-		ws_erro := 'Descri&ccedil;&atilde;o j&aacute; est&aacute; sendo utilizada em outra a&ccedil;&atilde;o do mesmo cliente';
+		ws_erro := 'J&aacute; existe uma a&ccedil;&atilde;o com esse identificador para esse cliente';
 		raise ws_raise_erro; 
 	end if;
 
 	if prm_id_copia is not null then
 		begin 
-			select tabela_criterio, id_conexao, comando, comando_limpar, tabela_transp 
-			into ws_tabela_criterio, ws_id_conexao, ws_comando, ws_comando_limpar, ws_tabela_transp
+			select tipo_comando, id_conexao, comando, comando_limpar, tbl_destino 
+			  into ws_tipo_comando, ws_id_conexao, ws_comando, ws_comando_limpar, ws_tbl_destino
 			from ctb_acoes 
 			where id_acao    = prm_id_copia
 			  and rownum     = 1 ;
-			ws_comando_limpar := REGEXP_REPLACE(ws_comando_limpar, ws_tabela_transp, prm_tabela_transp, 1, 0, 'i');   
+			ws_comando_limpar := REGEXP_REPLACE(ws_comando_limpar, ws_tbl_destino, prm_tbl_destino, 1, 0, 'i');   
 		exception when others then
 			null;
 		end; 	
 	else 
 		ws_comando         := null;
-		ws_comando_limpar  := 'DELETE '||prm_tabela_transp;
-		ws_tabela_criterio := prm_tabela_criterio; 
+		ws_comando_limpar  := 'DELETE '||prm_tbl_destino;
+		ws_tipo_comando := prm_tipo_comando; 
 		ws_id_conexao      := prm_id_conexao;
 	end if; 
 
-	ws_id_acao := null;
-	select max(id_acao) into ws_id_acao from ctb_acoes where id_cliente = prm_id_cliente; 
-	if ws_id_acao is null then 
-		ws_id_acao := (prm_id_cliente * 10000) + 1;
-	else 	
-		ws_id_acao := ws_id_acao + 1;
-	end if;
-	ws_id_acao := trim(to_char(ws_id_acao, '00000000'));
-
-	begin 
-		insert into ctb_acoes (id_cliente,     id_acao,    ds_acao,            id_conexao,    tabela_criterio,    tabela_transp,    comando, comando_limpar)
-	    	           values (prm_id_cliente, ws_id_acao, upper(prm_ds_acao), ws_id_conexao, ws_tabela_criterio, prm_tabela_transp, ws_comando, ws_comando_limpar);
-	exception when dup_val_on_index then
-		ws_erro := 'J&aacute; existe uma a&ccedil;&atilde;o com o ID gerado pelo sistema ['||ws_id_acao||'], entre em contato com o administrador do sistema.';
-		raise ws_raise_erro; 
-	end; 		
+	insert into ctb_acoes (id_cliente,     id_acao,     id_conexao,    tipo_comando,    tbl_destino,     comando,    comando_limpar)
+    	           values (prm_id_cliente, prm_id_acao, ws_id_conexao, ws_tipo_comando, prm_tbl_destino, ws_comando, ws_comando_limpar);
 
 	commit; 			  
 	htp.p('OK|Registro inserido');
@@ -1252,7 +1337,7 @@ begin
 	ws_parametro := upper(trim(prm_cd_parametro)); 
 	ws_conteudo  := prm_conteudo; 
 
-	if ws_parametro = 'TABELA_CRITERIO' then 
+	if ws_parametro = 'tipo_comando' then 
 		select comando into ws_comando from ctb_acoes where id_acao = prm_id_acao; 
 		if ws_conteudo = 'FULL' and ws_comando like '%$[%]%' then 
 			ws_alerta := '! Alerta, comando do tipo FULL n&atilde;o deve conter par&acirc;metros de data';
@@ -1260,12 +1345,11 @@ begin
 	end if; 
 
 	update ctb_acoes  
-	   set ds_acao         = decode(ws_parametro, 'DS_ACAO',          ws_conteudo, ds_acao       ), 
-	       id_conexao      = decode(ws_parametro, 'ID_CONEXAO',       ws_conteudo, id_conexao    ), 
-		   tabela_criterio = decode(ws_parametro, 'TABELA_CRITERIO',  ws_conteudo, tabela_criterio), 
-		   tabela_transp   = decode(ws_parametro, 'TABELA_TRANSP',    ws_conteudo, tabela_transp ), 
-		   comando         = decode(ws_parametro, 'COMANDO',          ws_conteudo, comando       ), 
-		   comando_limpar  = decode(ws_parametro, 'COMANDO_LIMPAR',   ws_conteudo, comando_limpar)
+	   set id_conexao     = decode(ws_parametro, 'ID_CONEXAO',       ws_conteudo, id_conexao    ), 
+		   tipo_comando   = decode(ws_parametro, 'TIPO_COMANDO',     ws_conteudo, tipo_comando), 
+		   tbl_destino    = decode(ws_parametro, 'TBL_DESTINO',      ws_conteudo, tbl_destino ), 
+		   comando        = decode(ws_parametro, 'COMANDO',          ws_conteudo, comando       ), 
+		   comando_limpar = decode(ws_parametro, 'COMANDO_LIMPAR',   ws_conteudo, comando_limpar)
 	 where id_acao    = prm_id_acao ; 
 	if sql%notfound then 
 		ws_erro := 'N&atilde;o localizado A&ccedil;&atilde;o com esse ID para esse cliente, recarrega a tela e tente novamente'; 
@@ -1375,7 +1459,7 @@ procedure ctb_acoes_exec_list(prm_tp      varchar2,
 					          prm_linhas	varchar2 default '50') as 
 	cursor c1 is  
 		select * from (
-			select ru.ds_run, ra.ordem, ae.id_acao, ac.ds_acao, ae.dt_inicio, ae.dt_final, ae.status, ae.tempo_local, ae.tempo_upload, ae.tempo_processo, ae.erro   
+			select ru.ds_run, ra.ordem, ae.id_acao, ae.dt_inicio, ae.dt_final, ae.status, ae.tempo_local, ae.tempo_upload, ae.tempo_processo, ae.erro   
 			from ctb_acoes ac, ctb_run_acoes ra, ctb_run ru, ctb_acoes_exec ae 
 			where ac.id_cliente     = ru.id_cliente
 				and ac.id_acao        = ra.id_acao 
@@ -1421,7 +1505,6 @@ begin
 				HTP.P('<th title="Tarefa executada">' 								 ||FUN.LANG('TAREFA')||'</th>');
 				HTP.P('<th title="Ordem da a&ccedil;&atilde;o na tarefa">'           ||FUN.LANG('ORDEM')||'</th>');				
 				HTP.P('<th title="Código da a&ccedil;&atilde;o executada">'          ||FUN.LANG('ID A&Ccedil;&Atilde;O')||'</th>');
-				HTP.P('<th title="Descr. da a&ccedil;&atilde;o executada">'          ||FUN.LANG('A&Ccedil;&Atilde;O')||'</th>');
 				HTP.P('<th title="Inicio da a&ccedil;&atilde;o">'                    ||FUN.LANG('INICIO')||'</th>');
 				HTP.P('<th title="Fim da a&ccedil;&atilde;o">'                       ||FUN.LANG('FIM')||'</th>');
 				HTP.P('<th title="Situa&ccedil;&atilde;o da a&ccedil;&atilde;o">'    ||FUN.LANG('SITUA&Ccedil;&Atilde;O')||'</th>');				
@@ -1436,8 +1519,7 @@ begin
 				htp.p('<tr>');
 					htp.p('<td class="ctb_col_ds_tarefa" style="width: 130px;">   <input disabled title="'||a.ds_run||'" value="'||a.ds_run||'"/></td>');					
 					htp.p('<td class="ctb_col_ordem">                             <input disabled title="'||a.ordem  ||'" value="'||a.ordem||'"/></td>');
-					htp.p('<td class="ctb_col_ds_acao" style="width: 130px;">     <input disabled title="'||a.id_acao||'" value="'||a.id_acao||'"/></td>');					
-					htp.p('<td class="ctb_col_ds_acao" style="width: 130px;">     <input disabled title="'||a.ds_acao||'" value="'||a.ds_acao||'"/></td>');					
+					htp.p('<td class="ctb_col_id_acao" style="width: 130px;">     <input disabled title="'||a.id_acao||'" value="'||a.id_acao||'"/></td>');					
 					htp.p('<td class="ctb_col_dh">                                <input disabled title="'||to_char(a.dt_inicio,'dd/mm/yyyy hh24:mi:ss')||'" value="'||to_char(a.dt_inicio,'dd/mm/yyyy hh24:mi:ss')||'"/></td>');
 					htp.p('<td class="ctb_col_dh">                                <input disabled title="'||to_char(a.dt_final,'dd/mm/yyyy hh24:mi:ss')||'" value="'||to_char(a.dt_final,'dd/mm/yyyy hh24:mi:ss')||'"/></td>');
 					htp.p('<td class="ctb_status">'||ctb.prn_a_status(a.status)||'</td>');
@@ -1544,8 +1626,7 @@ end tmp_docs_list;
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-procedure ctb_run_list (prm_id_cliente  varchar2 default null, 
-                        prm_order       varchar2 default '2', 
+procedure ctb_run_list (prm_order       varchar2 default '2', 
                         prm_dir         varchar2 default '1') as 
     
     ws_id_cliente      varchar2(50);
@@ -1554,7 +1635,8 @@ procedure ctb_run_list (prm_id_cliente  varchar2 default null,
 		select ru.id_cliente||'-'||cl.nm_cliente cliente, ru.id_cliente, ru.run_id, ru.ds_run, ru.dt_cadastro, ru.last_run, ru.last_status, ru.st_ativo 
           from ctb_clientes cl, ctb_run ru 
          where cl.id_cliente = ru.id_cliente 
-           and ru.id_cliente = decode(ws_id_cliente,'TODOS',ru.id_cliente, ws_id_cliente) 
+           --and ru.id_cliente = decode(ws_id_cliente,'TODOS',ru.id_cliente, ws_id_cliente) 
+		   and ru.id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = gbl.getusuario() and id_selecionado = 'S' ) 
 	  order by case when prm_dir = '1' then decode(prm_order, '1', ru.id_cliente, '2', run_id, '3', ds_run, '4', to_char(dt_cadastro,'YYMMDDHH24MI'), '5', st_ativo, '6', to_char(last_run, 'YYMMDDHH24MI'), '7', last_status, ds_run) end asc,
 			   case when prm_dir = '2' then decode(prm_order, '1', ru.id_cliente, '2', run_id, '3', ds_run, '4', to_char(dt_cadastro,'YYMMDDHH24MI'), '5', st_ativo, '6', to_char(last_run, 'YYMMDDHH24MI'), '7', last_status, ds_run) end desc ; 
 
@@ -1567,17 +1649,19 @@ procedure ctb_run_list (prm_id_cliente  varchar2 default null,
 	ws_status          varchar2(30); 
 begin 
 	ws_eventoGravar := ' "requestDefault(''ctb_run_update'', ''prm_run_id=#ID#&prm_cd_parametro=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB'');"'; 
-    ws_eventoOrdem  := 'var dir = order('''', ''ajax''); ajax(''list'', ''ctb_run_list'', ''prm_id_cliente='||prm_id_cliente||'&prm_order=#ORDER#&prm_dir=''+dir, false, ''content'','''','''',''CTB'');'; 
+    ws_eventoOrdem  := 'var dir = order('''', ''ajax''); ajax(''list'', ''ctb_run_list'', ''prm_order=#ORDER#&prm_dir=''+dir, false, ''content'','''','''',''CTB'');'; 
 	
     htp.p('<input type="hidden" id="content-atributos" data-refresh="ctb_run_list" data-pkg="ctb">');
 
-    ws_id_cliente   := nvl(prm_id_cliente, ctb.ctb_clie_usua_get(gbl.getusuario()));    
-    select nvl(max(nm_cliente),'TODOS') into ws_nm_cliente from ctb_clientes where id_cliente = ws_id_cliente;
-	htp.p('<div class="searchbar">');
-        htp.p('<a class="ctb-selecao-cliente">CLIENTE : </a>');
-        htp.p('<a class="script" onclick="call(''ctb_clie_usua_atu'', ''prm_id_cliente=''+this.nextElementSibling.title, ''ctb''); ajax(''list'', ''ctb_run_list'',  ''prm_id_cliente=''+this.nextElementSibling.title, true, ''content'','''','''',''CTB'');"></a>');
-		fcl.fakeoption('prm_id_cliente', '', ws_id_cliente, 'lista-ctb-clientes', 'N', 'N', prm_desc => ws_id_cliente||' - '||ws_nm_cliente );
-	htp.p('</div>');
+	ctb.ctb_usua_clie_lista(gbl.getusuario(), 'ctb_run_list');
+
+    --ws_id_cliente   := nvl(prm_id_cliente, ctb.ctb_clie_usua_get(gbl.getusuario()));    
+    --select nvl(max(nm_cliente),'TODOS') into ws_nm_cliente from ctb_clientes where id_cliente = ws_id_cliente;
+	--htp.p('<div class="searchbar">');
+    --    htp.p('<a class="ctb-selecao-cliente">CLIENTE : </a>');
+    --    htp.p('<a class="script" onclick="call(''ctb_usua_clie_sel'', ''prm_id_cliente=''+this.nextElementSibling.title, ''ctb''); ajax(''list'', ''ctb_run_list'',  ''prm_id_cliente=''+this.nextElementSibling.title, true, ''content'','''','''',''CTB'');"></a>');
+	--	fcl.fakeoption('prm_id_cliente', '', ws_id_cliente, 'lista-ctb-clientes', 'N', 'N', prm_desc => ws_id_cliente||' - '||ws_nm_cliente );
+	--htp.p('</div>');
 
 
 	htp.p('<table class="linha">');
@@ -1638,17 +1722,17 @@ begin
 					htp.p('<td><div style="width: 1px !important; min-width: 1px !important;"></div></td>');  -- Cria uma divisao 
 
 					htp.p('<td class="ctb_atalho" title="Agenda de execu&ccedil;&otilde;es da tarefa" '||
-					      ' onclick="carregaTelasup(''ctb_run_schedule_list'', ''prm_run_id='||a.run_id||''', ''CTB'', ''ctb_run_schedule'','''','''',''ctb_run_list|prm_id_cliente='||ws_id_cliente||'|CTB|ctb_run|||'');">');
+					      ' onclick="carregaTelasup(''ctb_run_schedule_list'', ''prm_run_id='||a.run_id||''', ''CTB'', ''ctb_run_schedule'','''','''',''ctb_run_list||CTB|ctb_run|||'');">');
 						htp.p('<svg height="512pt" width="512pt" viewBox="-34 0 512 512.04955" xmlns="http://www.w3.org/2000/svg"><path d="m.0234375 290.132812c-.02734375 121.429688 97.5703125 220.324219 218.9882815 221.898438 121.421875 1.574219 221.550781-94.753906 224.671875-216.144531 3.125-121.386719-91.917969-222.734375-213.257813-227.40625v-17.28125h17.066407c14.136718 0 25.597656-11.460938 25.597656-25.597657 0-14.140624-11.460938-25.601562-25.597656-25.601562h-51.199219c-14.140625 0-25.601563 11.460938-25.601563 25.601562 0 14.136719 11.460938 25.597657 25.601563 25.597657h17.066406v17.28125c-119.054687 4.707031-213.183594 102.507812-213.3359375 221.652343zm187.7343745-264.53125c0-4.714843 3.820313-8.535156 8.535157-8.535156h51.199219c4.710937 0 8.53125 3.820313 8.53125 8.535156 0 4.710938-3.820313 8.53125-8.53125 8.53125h-51.199219c-4.714844 0-8.535157-3.820312-8.535157-8.53125zm238.933594 264.53125c0 113.109376-91.691406 204.800782-204.800781 204.800782-113.105469 0-204.800781-91.691406-204.800781-204.800782 0-113.105468 91.695312-204.800781 204.800781-204.800781 113.054687.132813 204.667969 91.746094 204.800781 204.800781zm0 0"/><path d="m315.3125 127.402344c-57.828125-33.347656-129.046875-33.347656-186.878906 0-.136719.070312-.296875.070312-.441406.144531-.148438.078125-.214844.222656-.351563.308594-28.179687 16.4375-51.625 39.882812-68.0625 68.0625-.085937.136719-.222656.210937-.304687.347656-.085938.136719-.078126.300781-.148438.445313-33.347656 57.828124-33.347656 129.050781 0 186.878906.070312.144531.070312.300781.148438.445312.074218.144532.289062.347656.417968.535156 16.429688 28.097657 39.835938 51.472657 67.949219 67.875.136719.085938.214844.222657.351563.308594.136718.085938.433593.160156.648437.265625 57.714844 33.175781 128.71875 33.175781 186.433594 0 .214843-.105469.445312-.148437.648437-.265625.207032-.121094.214844-.222656.351563-.308594 28.117187-16.410156 51.523437-39.800781 67.949219-67.90625.128906-.1875.300781-.335937.417968-.539062.121094-.203125.078125-.296875.148438-.445312 33.347656-57.828126 33.347656-129.046876 0-186.878907-.070313-.144531-.070313-.296875-.148438-.441406-.074218-.148437-.21875-.214844-.304687-.34375-16.433594-28.183594-39.882813-51.632813-68.0625-68.070313-.136719-.085937-.214844-.222656-.351563-.308593-.136718-.082031-.261718-.039063-.410156-.109375zm49.777344 70.203125-7.050782 4.070312c-2.660156 1.515625-4.308593 4.339844-4.3125 7.402344-.007812 3.058594 1.625 5.890625 4.28125 7.417969 2.65625 1.523437 5.925782 1.507812 8.566407-.039063l7.058593-4.078125c11.027344 21.488282 17.332032 45.09375 18.488282 69.222656h-25.164063c-4.710937 0-8.53125 3.820313-8.53125 8.53125 0 4.714844 3.820313 8.535157 8.53125 8.535157h25.164063c-1.15625 24.128906-7.460938 47.730469-18.488282 69.222656l-7.058593-4.082031c-2.640625-1.546875-5.910157-1.5625-8.566407-.035156-2.65625 1.523437-4.289062 4.355468-4.28125 7.417968.003907 3.0625 1.652344 5.886719 4.3125 7.398438l7.050782 4.070312c-13.140625 20.265625-30.40625 37.53125-50.671875 50.671875l-4.070313-7.050781c-1.511718-2.660156-4.335937-4.308594-7.398437-4.3125-3.0625-.007812-5.894531 1.625-7.417969 4.28125-1.527344 2.65625-1.511719 5.925781.035156 8.566406l4.082032 7.058594c-21.492188 11.027344-45.09375 17.332031-69.222657 18.488281v-25.164062c0-4.710938-3.820312-8.53125-8.535156-8.53125-4.710937 0-8.53125 3.820312-8.53125 8.53125v25.164062c-24.128906-1.15625-47.734375-7.460937-69.222656-18.488281l4.078125-7.058594c1.546875-2.640625 1.5625-5.910156.039062-8.566406-1.527344-2.65625-4.359375-4.289062-7.417968-4.28125-3.0625.003906-5.886719 1.652344-7.402344 4.3125l-4.070313 7.050781c-20.265625-13.140625-37.53125-30.40625-50.667969-50.671875l7.046876-4.070312c2.660156-1.511719 4.308593-4.335938 4.316406-7.398438.007812-3.0625-1.628906-5.894531-4.285156-7.417968-2.652344-1.527344-5.921876-1.511719-8.566407.035156l-7.054687 4.082031c-11.03125-21.492187-17.335938-45.09375-18.492188-69.222656h25.164063c4.714843 0 8.535156-3.820313 8.535156-8.535157 0-4.710937-3.820313-8.53125-8.535156-8.53125h-25.164063c1.15625-24.128906 7.460938-47.734374 18.492188-69.222656l7.054687 4.078125c2.644531 1.546875 5.914063 1.5625 8.566407.039063 2.65625-1.527344 4.292968-4.359375 4.285156-7.417969-.007813-3.0625-1.65625-5.886719-4.316406-7.402344l-7.046876-4.070312c13.136719-20.265625 30.402344-37.53125 50.667969-50.671875l4.070313 7.050781c1.515625 2.660156 4.339844 4.308594 7.402344 4.316406 3.058593.003907 5.890624-1.628906 7.417968-4.285156 1.523438-2.65625 1.507813-5.921875-.039062-8.566406l-4.078125-7.054688c21.488281-11.03125 45.09375-17.335937 69.222656-18.492187v25.164062c0 4.714844 3.820313 8.535156 8.53125 8.535156 4.714844 0 8.535156-3.820312 8.535156-8.535156v-25.164062c24.128907 1.15625 47.730469 7.460937 69.222657 18.492187l-4.082032 7.054688c-1.546875 2.644531-1.5625 5.910156-.035156 8.566406 1.523438 2.65625 4.355469 4.289063 7.417969 4.285156 3.0625-.007812 5.886719-1.65625 7.398437-4.316406l4.070313-7.050781c20.265625 13.140625 37.53125 30.40625 50.671875 50.671875zm0 0"/><path d="m230.425781 266.101562v-86.902343c0-4.710938-3.820312-8.53125-8.535156-8.53125-4.710937 0-8.53125 3.820312-8.53125 8.53125v86.902343c-11.757813 4.15625-18.808594 16.179688-16.699219 28.46875 2.109375 12.285157 12.761719 21.269532 25.230469 21.269532s23.125-8.984375 25.230469-21.269532c2.109375-12.289062-4.941406-24.3125-16.695313-28.46875zm-8.535156 32.566407c-4.710937 0-8.53125-3.820313-8.53125-8.535157 0-4.710937 3.820313-8.53125 8.53125-8.53125 4.714844 0 8.535156 3.820313 8.535156 8.53125 0 4.714844-3.820312 8.535157-8.535156 8.535157zm0 0"/></svg>');						
 					htp.p('</td>');
 
 					htp.p('<td class="ctb_atalho" title="Lista de A&ccedil;&otilde;es" '||
-							  ' onclick="carregaTelasup(''ctb_run_acoes_list'', ''prm_run_id='||a.run_id||''', ''CTB'', ''ctb_run_acoes'','''','''',''ctb_run_list|prm_id_cliente='||ws_id_cliente||'|CTB|ctb_run|||'');">');
+							  ' onclick="carregaTelasup(''ctb_run_acoes_list'', ''prm_run_id='||a.run_id||''', ''CTB'', ''ctb_run_acoes'','''','''',''ctb_run_list||CTB|ctb_run|||'');">');
 						htp.p('<svg style="height: 30px; width: 30px;" viewBox="0 0 24 24" clip-rule="evenodd" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2" xmlns="http://www.w3.org/2000/svg"><path d="m21 4c0-.478-.379-1-1-1h-16c-.62 0-1 .519-1 1v16c0 .621.52 1 1 1h16c.478 0 1-.379 1-1zm-16.5.5h15v15h-15zm13.5 10.75c0-.414-.336-.75-.75-.75h-4.5c-.414 0-.75.336-.75.75s.336.75.75.75h4.5c.414 0 .75-.336.75-.75zm-11.772-.537 1.25 1.114c.13.116.293.173.455.173.185 0 .37-.075.504-.222l2.116-2.313c.12-.131.179-.296.179-.459 0-.375-.303-.682-.684-.682-.185 0-.368.074-.504.221l-1.66 1.815-.746-.665c-.131-.116-.293-.173-.455-.173-.379 0-.683.307-.683.682 0 .188.077.374.228.509zm11.772-2.711c0-.414-.336-.75-.75-.75h-4.5c-.414 0-.75.336-.75.75s.336.75.75.75h4.5c.414 0 .75-.336.75-.75zm-11.772-1.613 1.25 1.114c.13.116.293.173.455.173.185 0 .37-.074.504-.221l2.116-2.313c.12-.131.179-.296.179-.46 0-.374-.303-.682-.684-.682-.185 0-.368.074-.504.221l-1.66 1.815-.746-.664c-.131-.116-.293-.173-.455-.173-.379 0-.683.306-.683.682 0 .187.077.374.228.509zm11.772-1.639c0-.414-.336-.75-.75-.75h-4.5c-.414 0-.75.336-.75.75s.336.75.75.75h4.5c.414 0 .75-.336.75-.75z"/></svg>');
 					htp.p('</td>');
 
 					htp.p('<td class="ctb_atalho" title="Par&acirc;metros utilizados nas a&ccedil;&otilde;es da tarefa" '||
-							  ' onclick="carregaTelasup(''ctb_run_param_list'', ''prm_run_id='||a.run_id||''', ''CTB'', ''none'','''','''',''ctb_run_list|prm_id_cliente='||ws_id_cliente||'|CTB|ctb_run|||'');">');
+							  ' onclick="carregaTelasup(''ctb_run_param_list'', ''prm_run_id='||a.run_id||''', ''CTB'', ''none'','''','''',''ctb_run_list||CTB|ctb_run|||'');">');
 						htp.p('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 18h-2v5h-2v-5h-2v-3h6v3zm-2-17h-2v12h2v-12zm11 7h-6v3h2v12h2v-12h2v-3zm-2-7h-2v5h2v-5zm11 14h-6v3h2v5h2v-5h2v-3zm-2-14h-2v12h2v-12z"/></svg>');
 					htp.p('</td>');
 
@@ -2045,20 +2129,22 @@ end ctb_run_schedule_delete;
 procedure ctb_run_acoes_list(prm_run_id     varchar2) as 
 
 	cursor c_acoes is 
-	select ac.id_cliente, rc.run_id, run_acao_id, ordem, rc.id_acao, ac.ds_acao, dh_inicio, dh_fim, last_status 
-	  from ctb_acoes ac, ctb_run_acoes rc 
-	 where ac.id_acao = rc.id_acao 
-	   and rc.run_id  = prm_run_id order by ordem; 
+	select ac.id_cliente, rc.run_id, run_acao_id, ordem, rc.id_acao, dh_inicio, dh_fim, rc.last_status 
+	  from ctb_acoes ac, ctb_run_acoes rc, ctb_run ru 
+	 where ac.id_acao    = rc.id_acao 
+	   and ac.id_cliente = ru.id_cliente
+	   and rc.run_id     = ru.run_id
+	   and ru.run_id     = prm_run_id order by ordem; 
 	-- 						 	
 	ws_onkeypress_int  varchar2(1000); 
 	ws_eventoGravar    varchar2(1000); 
 	ws_evento          varchar2(1000); 
-	ws_ds_acao         ctb_acoes.id_acao%type;
-	ws_id_cliente      ctb_run.id_cliente%type; 
+	ws_id_acao         ctb_acoes.id_acao%type;
+	--ws_id_cliente      ctb_run.id_cliente%type; 
 	ws_status          ctb_run.last_status%type; 
 
 begin 
-	select max(id_cliente) into ws_id_cliente from ctb_run where run_id = prm_run_id; 
+	--select max(id_cliente) into ws_id_cliente from ctb_run where run_id = prm_run_id; 
 
 	ws_onkeypress_int := ' onkeypress="if(!input(event, ''integer'')) {event.preventDefault();} "';
 	ws_eventoGravar   := ' "requestDefault(''ctb_run_acoes_update'', ''prm_run_acao_id=#ID#&prm_cd_parametro=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB'');"'; 
@@ -2095,11 +2181,11 @@ begin
 
 					htp.p('<td class="fake-list" style="border-right: none; max-width: 170px !important;">');
 						htp.p('<a class="script" data-default="'||a.id_acao||'" onclick='||replace(replace(ws_evento,'#CAMPO#','ID_ACAO'),'#VALOR#','this.nextElementSibling.title')||'></a>');
-						fcl.fakeoption('prm_step_id_'||a.run_acao_id, '', a.id_acao, 'lista-ctb-acoes', prm_editable=>'S', prm_multi=>'N', prm_desc => a.id_acao||' - '||a.ds_acao, prm_min => 1, prm_class_adic => ' fakelist-border-right' );
+						fcl.fakeoption('prm_step_id_'||a.run_acao_id, '', a.id_acao, 'lista-ctb-acoes', prm_editable=>'S', prm_multi=>'N', prm_desc => a.id_acao, prm_min => 1, prm_class_adic => ' fakelist-border-right' );
 					htp.p('</td>');
 
 					htp.p('<td class="ctb_atalho" title="Abre a tela de cadastro de A&ccedil;&otilde;es" style="width: 30px;"'||
-							  ' onclick="carregaTelasup(''ctb_acoes_list'', ''prm_id_cliente='||ws_id_cliente||'&prm_id_acao='||a.id_acao||''', ''CTB'', '''','''','''',''ctb_run_acoes_list|prm_run_id='||prm_run_id||'|CTB|ctb_run_acoes|||'');">');
+							  ' onclick="carregaTelasup(''ctb_acoes_list'', ''prm_id_cliente='||a.id_cliente||'&prm_id_acao='||a.id_acao||''', ''CTB'', '''','''','''',''ctb_run_acoes_list|prm_run_id='||prm_run_id||'|CTB|ctb_run_acoes|||'');">');
 						htp.p('<svg style="height: 32px; width: 32px; float: left;" viewBox="0 0 24 24" clip-rule="evenodd" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2" xmlns="http://www.w3.org/2000/svg"><path d="m21 4c0-.478-.379-1-1-1h-16c-.62 0-1 .519-1 1v16c0 .621.52 1 1 1h16c.478 0 1-.379 1-1zm-16.5.5h15v15h-15zm12.5 10.75c0-.414-.336-.75-.75-.75h-8.5c-.414 0-.75.336-.75.75s.336.75.75.75h8.5c.414 0 .75-.336.75-.75zm0-3.248c0-.414-.336-.75-.75-.75h-8.5c-.414 0-.75.336-.75.75s.336.75.75.75h8.5c.414 0 .75-.336.75-.75zm0-3.252c0-.414-.336-.75-.75-.75h-8.5c-.414 0-.75.336-.75.75s.336.75.75.75h8.5c.414 0 .75-.336.75-.75z" fill-rule="nonzero"/></svg>');
 					htp.p('</td>');
 
@@ -2121,7 +2207,7 @@ begin
 					htp.p('</td>');
 
 					htp.p('<td class="ctb_atalho" title="Log do processo de atualiza&ccedil;&atilde;o das tabelas de destino." '||
-					      ' onclick="carregaTelasup(''tmp_docs_list'', ''prm_id_cliente='||ws_id_cliente||'&prm_id_acao='||a.id_acao||''', ''CTB'', ''none'','''','''',''ctb_run_acoes_list|prm_run_id='||prm_run_id||'|CTB|ctb_run_acoes|||'');">');
+					      ' onclick="carregaTelasup(''tmp_docs_list'', ''prm_id_cliente='||a.id_cliente||'&prm_id_acao='||a.id_acao||''', ''CTB'', ''none'','''','''',''ctb_run_acoes_list|prm_run_id='||prm_run_id||'|CTB|ctb_run_acoes|||'');">');
 						htp.p('<svg viewBox="0 0 600 600" xml:space="preserve"><g><path d="M486.201,196.124h-13.166V132.59c0-0.396-0.062-0.795-0.115-1.196c-0.021-2.523-0.825-5-2.552-6.963L364.657,3.677 c-0.033-0.031-0.064-0.042-0.085-0.073c-0.63-0.707-1.364-1.292-2.143-1.795c-0.229-0.157-0.461-0.286-0.702-0.421 c-0.672-0.366-1.387-0.671-2.121-0.892c-0.2-0.055-0.379-0.136-0.577-0.188C358.23,0.118,357.401,0,356.562,0H96.757 C84.894,0,75.256,9.651,75.256,21.502v174.613H62.092c-16.971,0-30.732,13.756-30.732,30.733v159.812 c0,16.968,13.761,30.731,30.732,30.731h13.164V526.79c0,11.854,9.638,21.501,21.501,21.501h354.776 c11.853,0,21.501-9.647,21.501-21.501V417.392h13.166c16.966,0,30.729-13.764,30.729-30.731V226.854 C516.93,209.872,503.167,196.124,486.201,196.124z M96.757,21.502h249.054v110.009c0,5.939,4.817,10.75,10.751,10.75h94.972v53.861 H96.757V21.502z M317.816,303.427c0,47.77-28.973,76.746-71.558,76.746c-43.234,0-68.531-32.641-68.531-74.152 c0-43.679,27.887-76.319,70.906-76.319C293.389,229.702,317.816,263.213,317.816,303.427z M82.153,377.79V232.085h33.073v118.039 h57.944v27.66H82.153V377.79z M451.534,520.962H96.757v-103.57h354.776V520.962z M461.176,371.092 c-10.162,3.454-29.402,8.209-48.641,8.209c-26.589,0-45.833-6.698-59.24-19.664c-13.396-12.535-20.75-31.568-20.529-52.967 c0.214-48.436,35.448-76.108,83.229-76.108c18.814,0,33.292,3.688,40.431,7.139l-6.92,26.37 c-7.999-3.457-17.942-6.268-33.942-6.268c-27.449,0-48.209,15.567-48.209,47.134c0,30.049,18.807,47.771,45.831,47.771 c7.564,0,13.623-0.852,16.21-2.152v-30.488h-22.478v-25.723h54.258V371.092L461.176,371.092z"></path><path d="M212.533,305.37c0,28.535,13.407,48.64,35.452,48.64c22.268,0,35.021-21.186,35.021-49.5 c0-26.153-12.539-48.655-35.237-48.655C225.504,255.854,212.533,277.047,212.533,305.37z"></path></g></svg>');
 					htp.p('</td>');
 
