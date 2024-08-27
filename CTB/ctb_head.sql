@@ -24,6 +24,7 @@ procedure ctb_fakelistoptions ( prm_ident     varchar2 default null,
 								prm_adicional varchar2 default null,
 								prm_search    varchar2 default null,
 								prm_obj		  varchar2 default null );
+procedure ctb_float_menu (prm_closed varchar2) ;
 procedure exec_schdl;
 
 procedure exec_run (prm_run_id             varchar2,
@@ -59,12 +60,21 @@ procedure menu_ctb (prm_menu      varchar2,
 		            prm_tipo      varchar2 default null,
 					prm_id_copia  varchar2 default null) ; 
 
+procedure ctb_destino_list;
+procedure ctb_destino_insert ( prm_parametros    varchar2, 
+						       prm_conteudos     varchar2 );
+procedure ctb_destino_update ( prm_id_cliente    varchar2, 
+                               prm_cd_parametro  varchar2,
+							   prm_conteudo      varchar2 ); 
+procedure ctb_destino_delete ( prm_id_cliente  varchar2 ); 							   
+
 procedure ctb_conexoes_valida (prm_acao           varchar2, 
 						 	   prm_campo          varchar2, 
                                prm_conteudo       varchar2,
 							   prm_retorno    out varchar2 ) ; 
 
-procedure ctb_conexoes_list  ;
+--procedure ctb_conexoes_list (prm_clientes  varchar2);
+procedure ctb_conexoes_list ;
 
 procedure ctb_conexoes_insert ( prm_parametros    varchar2, 
 							    prm_conteudos     varchar2 ) ; 
@@ -88,15 +98,13 @@ procedure ctb_acoes_insert (prm_id_cliente       varchar2,
 						    prm_tipo_comando     varchar2,
 						    prm_tbl_destino      varchar2,
 						    prm_id_copia         varchar2 default null); 
-
 procedure ctb_acoes_update (prm_id_acao       varchar2, 
                            	prm_cd_parametro  varchar2,
 						   	prm_conteudo      varchar2 ) ;
-
-procedure ctb_acoes_delete (prm_id_acao     varchar2 ) ;
-
-
-procedure ctb_acoes_comando (prm_id_acao    varchar2, 
+procedure ctb_acoes_delete (prm_id_cliente  varchar2,
+						    prm_id_acao     varchar2 ); 
+procedure ctb_acoes_comando (prm_id_cliente varchar2,
+ 						     prm_id_acao    varchar2, 
                              prm_coluna     varchar2) ; 
 
 procedure ctb_acoes_exec_list(prm_tp      varchar2,

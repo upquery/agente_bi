@@ -1,12 +1,20 @@
 create or replace package body CTB  is
 
     cursor c_param_conexao is 
-        select 01 ordem, 'SISTEMA'   cd, 'SISTEMA'    ds from dual union all         
+        select 01 ordem, 'SISTEMA'   cd, 'SISTEMA'    ds from dual union all
         select 02 ordem, 'DB'        cd, 'BASE DADOS' ds from dual union all 
-        select 03 ordem, 'HOST'      cd, 'HOST'       ds from dual union all         
+        select 03 ordem, 'HOST'      cd, 'HOST:PORTA' ds from dual union all         
         select 04 ordem, 'USUARIO'   cd, 'USUARIO'    ds from dual union all         
         select 05 ordem, 'SENHA'     cd, 'SENHA'      ds from dual union all         
         select 06 ordem, 'DATABASE'  cd, 'NOME BASE'  ds from dual 
+       order by 1 ;
+
+    cursor c_param_destino is 
+        select 01 ordem, 'HOST'          cd, 'HOST'         ds from dual union all         
+		select 02 ordem, 'PORTA'         cd, 'PORTA'        ds from dual union all         
+        select 03 ordem, 'USUARIO'       cd, 'USUARIO'      ds from dual union all         
+        select 04 ordem, 'SENHA'         cd, 'SENHA'        ds from dual union all         
+        select 05 ordem, 'SERVICE_NAME'  cd, 'NOME SERVIÇO' ds from dual 
        order by 1 ;
 
 
@@ -171,12 +179,12 @@ function prn_a_status  (prm_status varchar2) return varchar2 is
 	ws_status  varchar2(200);
 begin 
 	ws_classe := '';
-	if    prm_status in ('AGUARDANDO', 'STANDBY') then 	ws_cor := '#F6C21A';   ws_hint := 'Aguardando o inicio da execu&ccedil;&atilde;o pelo Agente.';
-	elsif prm_status in ('EXECUTANDO', 'RUNNING') then	ws_cor := '#F6C21A';   ws_hint := 'Sendo executado pelo Agente.';         ws_classe := 'executando' ; 
-	elsif prm_status in ('CONCLUIDO' , 'END')     then 	ws_cor := '#3C8846';   ws_hint := 'Conclu&iacute;do a execução pelo agente.';
-	elsif prm_status in ('ERRO')                  then 	ws_cor := '#F2142B';   ws_hint := 'Erro durante a execu&ccedil;&atilde;o.';
-	elsif prm_status in ('CANCELADO', 'CANCELED') then 	ws_cor := '#F2142B';   ws_hint := 'Cancelado.';
-	elsif prm_status in ('ALERTA')       	      then 	ws_cor := '#F6C21A';   ws_hint := 'Conclu&iacute;do com alerta para poss&iacute;vel erro no retorno obtido pelo Agente.';
+	if    prm_status = 'AGUARDANDO' then 	ws_cor := '#F6C21A';   ws_hint := 'Aguardando o inicio da execu&ccedil;&atilde;o pelo Agente.';
+	elsif prm_status = 'EXECUTANDO' then	ws_cor := '#F6C21A';   ws_hint := 'Sendo executado pelo Agente.';         ws_classe := 'executando' ; 
+	elsif prm_status = 'CONCLUIDO'  then 	ws_cor := '#3C8846';   ws_hint := 'Conclu&iacute;do a execução pelo agente.';
+	elsif prm_status = 'ERRO'       then 	ws_cor := '#F2142B';   ws_hint := 'Erro durante a execu&ccedil;&atilde;o.';
+	elsif prm_status = 'CANCELADO'  then 	ws_cor := '#F2142B';   ws_hint := 'Cancelado.';
+	elsif prm_status = 'ALERTA'     then 	ws_cor := '#F6C21A';   ws_hint := 'Conclu&iacute;do com alerta para poss&iacute;vel erro no retorno obtido pelo Agente.';
 	end if; 
 	ws_status := prm_status;
 	if prm_status = 'ALERTA' then 
@@ -271,7 +279,32 @@ begin
 end ctb_fakelistoptions; 							
 
 
+procedure ctb_float_menu (prm_closed varchar2) as 
+begin 
+	htp.p('<ul id="form-prefdrop-agente" class="form-config '||prm_closed||'" onmouseenter="this.focus();">');
 
+		htp.p('<li><a title="'||fun.lang('Agendador de tarefas')||'" data-menu="ctb_run" data-refresh="ctb_run_list" data-refresh-pkg="ctb" data-carrega="ctb_run_list" data-package="ctb" data-attrib="">');
+			htp.p('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M17 3v-2c0-.552.447-1 1-1s1 .448 1 1v2c0 .552-.447 1-1 1s-1-.448-1-1zm-12 1c.553 0 1-.448 1-1v-2c0-.552-.447-1-1-1-.553 0-1 .448-1 1v2c0 .552.447 1 1 1zm13 13v-3h-1v4h3v-1h-2zm-5 .5c0 2.481 2.019 4.5 4.5 4.5s4.5-2.019 4.5-4.5-2.019-4.5-4.5-4.5-4.5 2.019-4.5 4.5zm11 0c0 3.59-2.91 6.5-6.5 6.5s-6.5-2.91-6.5-6.5 2.91-6.5 6.5-6.5 6.5 2.91 6.5 6.5zm-14.237 3.5h-7.763v-13h19v1.763c.727.33 1.399.757 2 1.268v-9.031h-3v1c0 1.316-1.278 2.339-2.658 1.894-.831-.268-1.342-1.111-1.342-1.984v-.91h-9v1c0 1.316-1.278 2.339-2.658 1.894-.831-.268-1.342-1.111-1.342-1.984v-.91h-3v21h11.031c-.511-.601-.938-1.273-1.268-2z"/></svg>');
+			htp.p('<span>'||fun.lang('Tarefas')||'</span>');
+		htp.p('</a></li>');
+
+		htp.p('<li><a title="'||fun.lang('A&ccedil;&otilde;es')||'" data-menu="ctb_acoes" data-refresh="" data-carrega="ctb_acoes_list" data-package="ctb" data-attrib="">');
+			htp.p('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2c5.514 0 10 4.486 10 10s-4.486 10-10 10-10-4.486-10-10 4.486-10 10-10zm0-2c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm-3 17v-10l9 5.146-9 4.854z"/></svg>');
+			htp.p('<span>'||fun.lang('A&ccedil;&otilde;es')||'</span>');
+		htp.p('</a></li>');
+
+		htp.p('<li><a title="'||fun.lang('Conex&otilde;es Origem')||'" data-menu="ctb_conexoes" data-refresh="" data-carrega="ctb_conexoes_list" data-package="ctb" data-attrib="">');
+			htp.p('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M1 3.488c0-1.926 4.656-3.488 10-3.488 5.345 0 10 1.562 10 3.488s-4.655 3.487-10 3.487c-5.344 0-10-1.561-10-3.487zm10 9.158c5.345 0 10-1.562 10-3.487v-2.44c-2.418 1.738-7.005 2.256-10 2.256-3.006 0-7.588-.523-10-2.256v2.44c0 1.926 4.656 3.487 10 3.487zm0 5.665c.34 0 .678-.007 1.011-.019.045-1.407.537-2.7 1.342-3.745-.839.067-1.643.1-2.353.1-3.006 0-7.588-.523-10-2.256v2.434c0 1.925 4.656 3.486 10 3.486zm1.254 1.97c-.438.02-.861.03-1.254.03-2.995 0-7.582-.518-10-2.256v2.458c0 1.925 4.656 3.487 10 3.487 1.284 0 2.526-.092 3.676-.256-1.155-.844-2.02-2.055-2.422-3.463zm10.746-1.781c0 2.485-2.017 4.5-4.5 4.5s-4.5-2.015-4.5-4.5 2.017-4.5 4.5-4.5 4.5 2.015 4.5 4.5zm-2.166-1.289l-2.063.557.916-1.925-1.387.392-1.466 3.034 1.739-.472-1.177 2.545 3.438-4.131z"/></svg>');
+			htp.p('<span>'||fun.lang('Conex&otilde;es Origem')||'</span>');
+		htp.p('</a></li>');
+
+		htp.p('<li><a title="'||fun.lang('Conex&otilde;es Destino')||'" data-menu="ctb_destino" data-refresh="" data-carrega="ctb_destino_list" data-package="ctb" data-attrib="">');
+			htp.p('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M1 3.488c0-1.926 4.656-3.488 10-3.488 5.345 0 10 1.562 10 3.488s-4.655 3.487-10 3.487c-5.344 0-10-1.561-10-3.487zm10 9.158c5.345 0 10-1.562 10-3.487v-2.44c-2.418 1.738-7.005 2.256-10 2.256-3.006 0-7.588-.523-10-2.256v2.44c0 1.926 4.656 3.487 10 3.487zm0 5.665c.34 0 .678-.007 1.011-.019.045-1.407.537-2.7 1.342-3.745-.839.067-1.643.1-2.353.1-3.006 0-7.588-.523-10-2.256v2.434c0 1.925 4.656 3.486 10 3.486zm1.254 1.97c-.438.02-.861.03-1.254.03-2.995 0-7.582-.518-10-2.256v2.458c0 1.925 4.656 3.487 10 3.487 1.284 0 2.526-.092 3.676-.256-1.155-.844-2.02-2.055-2.422-3.463zm10.746-1.781c0 2.485-2.017 4.5-4.5 4.5s-4.5-2.015-4.5-4.5 2.017-4.5 4.5-4.5 4.5 2.015 4.5 4.5zm-2.166-1.289l-2.063.557.916-1.925-1.387.392-1.466 3.034 1.739-.472-1.177 2.545 3.438-4.131z"/></svg>');
+			htp.p('<span>'||fun.lang('Conex&otilde;es Destino')||'</span>');
+		htp.p('</a></li>');
+
+	htp.p('</ul>');			
+end ctb_float_menu; 
 
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -386,7 +419,7 @@ procedure exec_run (prm_run_id             varchar2,
 
 begin
 
-    ws_id_agendamento := to_char(sysdate,'yymmddhh24miss')||'-'||replace(prm_run_id,'RUN_','')||'-'||ctb.randomCode(5); 
+    ws_id_agendamento := to_char(sysdate,'yymmddhh24miss')||'-'||UPPER(ctb.randomCode(5)); 
 	ws_erro := null;
 
 	-- Cancela se a tarefa já estiver em execução 
@@ -443,13 +476,13 @@ begin
 				ws_erro := nvl(ws_erro, ws_erro_limpar);
 			end if;	
 			ctb.ctb_atu_status_acao(a.run_acao_id, 'ERRO');
-			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   comando,         comando_limpar,    tbl_destino,   status,    dt_inicio, erro) 
-							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, ws_comando_blob, ws_comando_limpar, a.tbl_destino, 'ERRO',    sysdate,   ws_erro );
+			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   id_conexao,   comando,         comando_limpar,    tbl_destino,   status,    dt_inicio, erro) 
+							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, a.id_conexao, ws_comando_blob, ws_comando_limpar, a.tbl_destino, 'ERRO',    sysdate,   ws_erro );
 		else 	
 			ws_comando_blob := ctb.c2b(ws_comando);
 			ctb.ctb_atu_status_acao(a.run_acao_id, 'AGUARDANDO');
-			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   comando,         comando_limpar,    tbl_destino,    status,    dt_inicio) 
-							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, ws_comando_blob, ws_comando_limpar, a.tbl_destino, 'STANDBY', sysdate);
+			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   id_conexao,   comando,         comando_limpar,    tbl_destino,    status,      dt_inicio) 
+							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, a.id_conexao, ws_comando_blob, ws_comando_limpar, a.tbl_destino, 'AGUARDANDO', sysdate);
     	end if;     
 	end loop; 	
 
@@ -766,6 +799,21 @@ begin
 	           'data-req="ctb_conexoes_insert" data-par-agrupa="S" data-par="'||ws_param||'" '||
 			   'data-res="ctb_conexoes_list"  data-msg="'||fun.lang('Adicionado com sucesso')||'" data-pkg="ctb">'||fun.lang('ADICIONAR')||'</a>');
 
+	when prm_menu = 'ctb_destino' then 	
+
+		htp.p('<h4>'||fun.lang('CONEX&Otilde;ES DESTINO')||'</h4>');
+
+		htp.p('<span class="script" onclick="call(''menu_ctb'', ''prm_menu=ctb_destino&prm_tipo=''+this.nextElementSibling.title, ''ctb'').then(function(resposta){ '||' if(resposta.indexOf(''ERRO|'') == -1){ alerta(''feed-fixo'', resposta.split(''|'')[1]); } else { document.getElementById(''painel'').innerHTML = resposta; }  });"></span>');
+		ws_param := 'prm_id_cliente'; 
+		for a in c_param_destino loop
+		    htp.p('<input type="text" id="prm_'||a.cd||'" data-min="1" placeholder="'||upper(a.ds)||'" data-encode="S" '||ws_onkeypress||'/>');
+            ws_param := ws_param||'|prm_'||a.cd; 
+		end loop;
+
+		htp.p('<a class="addpurple followed" title="'||fun.lang('Adicionar conex&atilde;o')||'" data-sup="ctb_destino" '||  
+	           'data-req="ctb_destino_insert" data-par-agrupa="S" data-par="'||ws_param||'" '||
+			   'data-res="ctb_destino_list"  data-msg="'||fun.lang('Adicionado com sucesso')||'" data-pkg="ctb">'||fun.lang('ADICIONAR')||'</a>');
+
     when prm_menu = 'ctb_acoes' then
 
 		htp.p('<h4>'||fun.lang('A&Ccedil;&Otilde;ES / COMANDOS')||'</h4>');
@@ -858,6 +906,222 @@ exception when others then
 end menu_ctb; 
 
 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+procedure ctb_destino_list as 
+    ws_nm_cliente   varchar2(200);
+	ws_conteudo     varchar2(4000); 	
+    ws_eventoGravar varchar2(2000);
+    ws_evento       varchar2(2000);
+begin 
+
+    ws_eventoGravar := ' "requestDefault(''ctb_destino_update'', ''prm_id_cliente=#CLIENTE#&prm_cd_parametro=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB'');"'; 
+    htp.p('<input type="hidden" id="content-atributos" data-refresh="ctb_destino_list" data-pkg="ctb" >');
+
+    ctb.ctb_usua_clie_lista(gbl.getusuario(), 'ctb_destino_list');
+
+    htp.p('<table class="linha">');
+        htp.p('<thead>');
+            htp.p('<tr>');
+                htp.p('<th>CLIENTE</th>');
+                for a in c_param_destino loop  
+                    htp.p('<th>'||a.ds||'</th>');
+                end loop;
+			htp.p('</tr>');
+		htp.p('</thead>');
+			
+		htp.p('<tbody id="ajax" >');
+        for a in (select distinct des.id_cliente, cli.nm_cliente
+                    from ctb_clientes cli, ctb_destino des 
+                   where cli.id_cliente = des.id_cliente 
+                     and des.id_cliente in (select id_cliente from ctb_usuario_cliente where id_selecionado = 'S')
+                   order by des.id_cliente) loop 	
+            ws_evento := ws_eventoGravar;
+            ws_evento := replace(ws_evento,'#CLIENTE#', a.id_cliente);
+
+			htp.p('<tr id="'||a.id_cliente||'">');
+                htp.p('<td><div>'||a.id_cliente||'-'||a.nm_cliente||'</div></td>');
+                for b in c_param_destino loop 
+                    select max(conteudo) into ws_conteudo from ctb_destino where id_cliente = a.id_cliente and cd_parametro = b.cd ;
+                    ws_conteudo := replace(ws_conteudo,'"', '&#34;');
+					htp.p('<td>');
+                        htp.p('<input id="prm_'||lower(b.cd)||'_'||a.id_cliente||'" type="text" data-min="1" data-default="'||ws_conteudo||'" value="'||ws_conteudo||'" '||
+                        'onblur=" if (this.value !== this.getAttribute(''data-default'')) { call(''ctb_destino_update'', ''prm_id_cliente='||a.id_cliente||'&prm_cd_parametro='||upper(b.cd)||'&prm_conteudo=''+this.value,''CTB'').then(function(resposta){alerta(''feed-fixo'',resposta.split(''|'')[1]); });}" />');
+					htp.p('</td>');
+                end loop;
+                            
+                htp.p('<td  class="ctb_atalho">');
+                    fcl.button_lixo('ctb_destino_delete','prm_id_cliente', a.id_cliente, prm_tag => 'a', prm_pkg => 'CTB');
+                htp.p('</td>');
+            htp.p('</tr>');						
+		end loop; 	
+			
+    htp.p('</tbody>');
+    htp.p('</table>');	
+exception when others then
+    htp.p('Erro montando tela, entre em contato com o adminstrador do sistema!');	
+    if nvl(gbl.getNivel, 'N') = 'A' then 
+        htp.p('Erro:'||dbms_utility.format_error_stack||dbms_utility.format_error_backtrace);	
+    end if;     
+    insert into bi_log_sistema (dt_log, ds_log, nm_usuario, nm_procedure) values (sysdate, 'ctb_destino_list(others): Erro: '||dbms_utility.format_error_stack||dbms_utility.format_error_backtrace, gbl.getusuario(), 'ERRO');
+    commit; 
+end ctb_destino_list; 
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+procedure ctb_destino_insert ( prm_parametros    varchar2, 
+						       prm_conteudos     varchar2 ) as 
+	type ws_tp_conteudos is table of varchar2(200) index by pls_integer;
+	ws_conteudos		ws_tp_conteudos ;
+
+	ws_idx        integer; 
+	ws_conteudo   varchar2(4000); 
+    ws_id_cliente varchar2(100); 
+	ws_id_conexao varchar2(100); 
+    ws_usuario    varchar2(200);
+	ws_count      number;
+
+	ws_erro     varchar2(300); 
+	raise_erro  exception;
+begin 
+
+	ws_usuario := gbl.getusuario(); 
+
+    -- Grava todos os conteudos em um array 
+	ws_idx := 0 ;
+	for a in (select column_value conteudo from table(fun.vpipe(prm_conteudos))) loop 
+		ws_idx := ws_idx + 1; 
+		ws_conteudos(ws_idx) := a.conteudo; 
+	end loop; 
+	
+	-- Passa por todos os parametros, pega o conteúdo e grava na tabela 
+	ws_idx        := 0; 
+    ws_id_cliente := null; 
+    ws_id_conexao := null;     
+	for a in (select upper(column_value) cd_parametro from table(fun.vpipe(prm_parametros)) where column_value is not null ) loop 
+		ws_idx      := ws_idx + 1; 
+		ws_conteudo := ws_conteudos(ws_idx); 
+		
+		if a.cd_parametro = 'ID_CLIENTE' then 
+			ws_id_cliente := ws_conteudo;
+			if ws_id_cliente like '%@PIPE@%' then 
+				ws_erro := 'Para adicionar, deve ser selecionado apenas um cliente na lista de CLIENTES';
+				raise raise_erro;
+			end if; 
+            if length(ws_conteudo) = 0 or ws_conteudo is null then 
+				ws_erro := 'Para adicionar, deve &eacute; necess&aacute;rio selecionar um cliente na lista de CLIENTES';
+				raise raise_erro;
+            end if; 
+            ws_conteudo := ws_id_cliente;
+		end if; 	
+
+		ctb_conexoes_valida ('I', a.cd_parametro, ws_conteudo, ws_erro); 
+		if ws_erro is not null then 
+			raise raise_erro; 
+		end if; 
+
+		if a.cd_parametro <> 'ID_CLIENTE' then 
+
+            if ws_id_cliente is null then         
+                ws_erro := 'Erro obtendo cliente para cadastro da conex&atilde;o de destino';
+                raise raise_erro; 
+            end if; 
+
+			select count(*) into ws_count from ctb_destino where id_cliente = ws_id_cliente and cd_parametro = a.cd_parametro;
+			if ws_count > 0 then 
+				ws_erro := 'O cliente pode ter somente uma conexão de destino';
+				raise raise_erro; 
+			end if; 
+
+            begin 
+                insert into ctb_destino (id_cliente, cd_parametro, conteudo) values (ws_id_cliente, a.cd_parametro, ws_conteudo);
+            exception when others then 
+                rollback; 
+                insert into bi_log_sistema values(sysdate, 'ctb_destino_insert (insert) :'||DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, gbl.getusuario, 'ERRO');
+                commit;
+                ws_erro	:= 'Erro inserindo parametro ['||a.cd_parametro||'], verique o log de erros do sistema';
+                raise raise_erro; 
+            end; 
+        end if; 
+	end loop; 
+	--
+	commit; 
+	--
+	htp.p('OK|Registro atualizado');
+exception 
+	when raise_erro then 
+		rollback; 
+		htp.p('ERRO|'||ws_erro);
+	when others then 	
+		rollback; 
+		ws_erro	:= 'Erro inserindo registro, verique o log de erros do sistema';
+		htp.p('ERRO|'||ws_erro);
+    	insert into bi_log_sistema values(sysdate, 'ctb_destino_insert (others) :'||DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, gbl.getusuario, 'ERRO');
+		commit;
+end ctb_destino_insert; 
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+procedure ctb_destino_update ( prm_id_cliente    varchar2, 
+                               prm_cd_parametro  varchar2,
+							   prm_conteudo      varchar2 ) as 
+	raise_erro  exception; 							   
+	ws_erro     varchar2(300); 
+begin 
+
+	ctb_conexoes_valida ('U',prm_cd_parametro, prm_conteudo, ws_erro); if ws_erro is not null then raise raise_erro; end if; 
+
+	update ctb_destino 
+	   set conteudo = prm_conteudo 
+	 where id_cliente   = prm_id_cliente
+	   and cd_parametro = prm_cd_parametro;
+	if sql%notfound then    
+		insert into ctb_destino (id_cliente, cd_parametro, conteudo) values (prm_id_cliente, prm_cd_parametro, prm_conteudo); 
+	end if;        
+	commit; 
+	htp.p('OK|Registro atualizado');
+exception 
+	when raise_erro then 
+		htp.p('ERRO|'||ws_erro);
+	when others then 	
+		ws_erro	:= 'Erro alterando registro, verifique o log de erros do sistema.';
+		htp.p('ERRO|'||ws_erro);
+    	insert into bi_log_sistema values(sysdate, 'ctb_destino_update (others) :'||DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, gbl.getusuario, 'ERRO');
+		commit;
+end ctb_destino_update; 
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+procedure ctb_destino_delete ( prm_id_cliente  varchar2 ) as 
+	ws_count    integer; 
+	ws_erro     varchar2(300); 
+	raise_erro  exception; 							   
+begin 
+
+	select count(*) into ws_count 
+	  from ctb_acoes  
+	 where id_cliente = prm_id_cliente; 
+	if ws_count > 0 then 
+		ws_erro := 'N&atilde;o &eacute; poss&iacute;vel excluir a conex&atilde;o de destino porque o cliente j&aacute; possui a&ccedil;&otilde;es cadastradas'; 
+		raise raise_erro; 
+	end if; 
+
+	delete ctb_destino where id_cliente = prm_id_cliente;  
+	commit;
+
+	htp.p('OK|Registro exclu&iacute;do');
+
+exception 
+	when raise_erro then 
+		htp.p('ERRO|'||ws_erro);
+	when others then 	
+		ws_erro	:= 'Erro excluindo registro, verifique o log de erros do sistema.';
+		htp.p('ERRO|'||ws_erro);
+    	insert into bi_log_sistema values(sysdate, 'ctb_destino_delete (others) :'||DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, gbl.getusuario, 'ERRO');
+		commit;
+end ctb_destino_delete; 
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure ctb_conexoes_valida (prm_acao           varchar2, 
 						 	   prm_campo          varchar2, 
                                prm_conteudo       varchar2,
@@ -866,16 +1130,16 @@ procedure ctb_conexoes_valida (prm_acao           varchar2,
 begin 
 	prm_retorno := null;
 	if prm_campo in ('ID_CLIENTE') and prm_conteudo = 'TODOS' then  
-		prm_retorno := 'Para inclus&atilde;o &eacute; necess&aacute;rio que uma empresa seja selecionada'; 
+		prm_retorno := 'Para inclus&atilde;o &eacute; necess&aacute;rio que uma empresa/cliente seja selecionada'; 
 	end if; 
 
-	if prm_campo in ('ID_CONEXAO','DB', 'HOST','DATABASE','USUARIO','SENHA') then  
+	if prm_campo in ('ID_CONEXAO','DB', 'HOST','DATABASE','USUARIO','SENHA','SERVICE_NAME') then  
 		if instr(prm_conteudo,' ') <> 0 then 
 			prm_retorno := '['||prm_campo||'] n&atilde;o pode conter espa&ccedil;os em branco'; 
 		end if; 	
 	end if; 
 
-	if prm_conteudo is null and prm_campo in ('ID_CLIENTE','ID_CONEXAO','DB', 'HOST','DATABASE','USUARIO','SENHA') then  
+	if prm_conteudo is null and prm_campo in ('ID_CLIENTE','ID_CONEXAO','DB', 'HOST','DATABASE','USUARIO','SENHA','SERVICE_NAME') then  
 		prm_retorno := '['||prm_campo||'] deve ser preenchido'; 
 	end if; 
 
@@ -924,7 +1188,8 @@ begin
         for a in (select distinct con.id_cliente, cli.nm_cliente, con.id_conexao  
                     from ctb_clientes cli, ctb_conexoes con 
                    where cli.id_cliente = con.id_cliente 
-                     and con.id_cliente in (select id_cliente from ctb_usuario_cliente where id_selecionado = 'S')
+				     --and con.id_cliente in (select column_value from table(fun.vpipe(prm_clientes)))
+					 and con.id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = gbl.getusuario() and id_selecionado = 'S' ) 
                    order by con.id_cliente, con.id_conexao) loop 	
             ws_evento := ws_eventoGravar;
             ws_evento := replace(ws_evento,'#CLIENTE#', a.id_cliente);
@@ -984,8 +1249,6 @@ procedure ctb_conexoes_insert ( prm_parametros    varchar2,
 	raise_erro  exception;
 begin 
 
-insert into err_txt values ('a1:'||prm_conteudos);
-commit; 
 	ws_usuario := gbl.getusuario(); 
 
     -- Grava todos os conteudos em um array 
@@ -1053,7 +1316,7 @@ exception
 		rollback; 
 		ws_erro	:= 'Erro inserindo registro, verique o log de erros do sistema';
 		htp.p('ERRO|'||ws_erro);
-    	insert into bi_log_sistema values(sysdate, 'ctb_conexoes_update (others) :'||DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, gbl.getusuario, 'ERRO');
+    	insert into bi_log_sistema values(sysdate, 'ctb_conexoes_insert (others) :'||DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, gbl.getusuario, 'ERRO');
 		commit;
 end ctb_conexoes_insert; 
 
@@ -1120,6 +1383,7 @@ exception
 		commit;
 end ctb_conexoes_delete; 
 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure ctb_acoes_list (prm_id_cliente   varchar2 default null,
                           prm_id_acao      varchar2 default null,
 						  prm_order        varchar2 default '2',
@@ -1198,7 +1462,7 @@ begin
 		htp.p('<tbody id="ajax" data-dir="'||ws_dir||'">');
 			for a in c1 loop 
 				ws_evento   := replace(ws_eventoGravar,'#ID#',a.id_acao); 
-				htp.p('<tr id="'||a.id_acao||'">');
+				htp.p('<tr id="'||a.id_acao||'" data-id_cliente="'||a.id_cliente||'">');
 					
                     htp.p('<td>'||a.id_cliente||'-'||a.nm_cliente||'</td>');
                     htp.p('<td>'||a.id_acao||'</td>');
@@ -1281,7 +1545,9 @@ begin
 		raise ws_raise_erro; 
 	end if; 
 
-	select count(*) into ws_count from ctb_acoes where id_cliente = prm_id_cliente and trim(upper(id_acao)) = trim(upper(prm_id_acao)) ; 
+	select count(*) into ws_count from ctb_acoes 
+	  where id_cliente = prm_id_cliente 
+	    and id_acao    = trim(upper(prm_id_acao)) ; 
 	if ws_count > 0 then 
 		ws_erro := 'J&aacute; existe uma a&ccedil;&atilde;o com esse identificador para esse cliente';
 		raise ws_raise_erro; 
@@ -1292,7 +1558,8 @@ begin
 			select tipo_comando, id_conexao, comando, comando_limpar, tbl_destino 
 			  into ws_tipo_comando, ws_id_conexao, ws_comando, ws_comando_limpar, ws_tbl_destino
 			from ctb_acoes 
-			where id_acao    = prm_id_copia
+			where id_cliente = prm_id_cliente
+			  and id_acao    = prm_id_copia
 			  and rownum     = 1 ;
 			ws_comando_limpar := REGEXP_REPLACE(ws_comando_limpar, ws_tbl_destino, prm_tbl_destino, 1, 0, 'i');   
 		exception when others then
@@ -1369,7 +1636,8 @@ exception
 		commit;
 end ctb_acoes_update;
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-procedure ctb_acoes_delete (prm_id_acao     varchar2 ) as 
+procedure ctb_acoes_delete (prm_id_cliente  varchar2,
+						    prm_id_acao     varchar2 ) as 
 	ws_count    integer; 
 	ws_erro     varchar2(300); 
 	ws_ds_run   varchar2(300); 
@@ -1379,15 +1647,16 @@ begin
 	ws_ds_run := null;
 	select max(ds_run) into ws_ds_run  
 	  from ctb_run a, ctb_run_acoes b
-	 where a.run_id  = b.run_id 
-	   and b.id_acao = prm_id_acao; 
+	 where a.run_id     = b.run_id 
+	   and a.id_cliente = prm_id_cliente
+	   and b.id_acao    = prm_id_acao; 
 	
 	if ws_ds_run is not null then 
 		ws_erro := 'A&ccedil;&atilde;o n&atilde;o pode ser exclu&iacute;da porque est&aacute; sendo utilizada na tarefa ['||ws_ds_run||']';
 		raise raise_erro; 
 	end if;  
 
-	delete ctb_acoes where id_acao = prm_id_acao ;
+	delete ctb_acoes where id_cliente = prm_id_cliente and id_acao = prm_id_acao ;
 	commit;
 
 	htp.p('OK|Registro exclu&iacute;do');
@@ -1403,7 +1672,8 @@ exception
 end ctb_acoes_delete; 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-procedure ctb_acoes_comando (prm_id_acao    varchar2, 
+procedure ctb_acoes_comando (prm_id_cliente varchar2,
+                             prm_id_acao    varchar2, 
                              prm_coluna     varchar2) as 
     ws_comando        clob;
 	ws_titulo         varchar2(100);
@@ -1418,7 +1688,8 @@ begin
 	begin 
 		select decode(prm_coluna, 'COMANDO',comando, 'COMANDO_LIMPAR', comando_limpar) into ws_comando    
 	  	  from ctb_acoes  
-	     where id_acao    = prm_id_acao;
+	     where id_cliente = prm_id_cliente
+		   and id_acao    = prm_id_acao;
 	exception when others then 
 		ws_erro := 'Erro obtendo comando, feche a tela e abra novamente.';
 		raise ws_raise_erro;	 
@@ -2477,23 +2748,23 @@ begin
 		
 		select count(*) into ws_count from ctb_acoes_exec 
 		where run_acao_id = a.run_acao_id 
- 		  and status      = 'RUNNING'; 
+ 		  and status      = 'EXECUTANDO'; 
 		ws_qt_run_exec := ws_qt_run_exec + ws_count; 
 
 		update ctb_acoes_exec 
-		set status = 'CANCELED',
+		set status = 'CANCELADO',
 			erro   = 'Execucao cancelada pelo Usuario ['||ws_usuario||']'
 		where run_acao_id = a.run_acao_id 
-		  and status in ('RUNNING','STANDBY') ; 
+		  and status in ('EXECUTANDO','AGUARDANDO') ; 
 
 		select count(*) into ws_count from tmp_docs 
 		where id_cliente   = a.id_cliente 
 			and id_acao    = a.id_acao 
-			and status     = 'RUNNING'; 
+			and status     = 'EXECUTANDO'; 
 		ws_qt_run_doc := ws_qt_run_doc + ws_count; 	
 
 		update tmp_docs 
-			set status = 'CANCELED', 
+			set status = 'CANCELADO', 
 				erro   = 'Execucao cancelada pelo Usuario ['||ws_usuario||']'
 		where id_cliente   = a.id_cliente 
 			and id_acao    = a.id_acao 

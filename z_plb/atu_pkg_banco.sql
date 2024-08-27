@@ -1,6 +1,6 @@
 set define off;
 PROMPT 
-PROMPT ------------------------------- CFG ---------------- 
+PROMPT ------------------------------- CTB ---------------- 
 
 @ctb/ctb_head.plb
 @ctb/ctb.plb
