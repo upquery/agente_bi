@@ -181,10 +181,13 @@ begin
 	ws_classe := '';
 	if    prm_status = 'AGUARDANDO' then 	ws_cor := '#F6C21A';   ws_hint := 'Aguardando o inicio da execu&ccedil;&atilde;o pelo Agente.';
 	elsif prm_status = 'EXECUTANDO' then	ws_cor := '#F6C21A';   ws_hint := 'Sendo executado pelo Agente.';         ws_classe := 'executando' ; 
+	--if    prm_status = 'RECEBIDO' then 	ws_cor := '#F6C21A';   ws_hint := 'Aguardando o inicio da execu&ccedil;&atilde;o pelo Agente.';
+	--elsif prm_status = 'INSERINDO' then	ws_cor := '#F6C21A';   ws_hint := 'Sendo executado pelo Agente.';         ws_classe := 'executando' ; 
 	elsif prm_status = 'CONCLUIDO'  then 	ws_cor := '#3C8846';   ws_hint := 'Conclu&iacute;do a execução pelo agente.';
 	elsif prm_status = 'ERRO'       then 	ws_cor := '#F2142B';   ws_hint := 'Erro durante a execu&ccedil;&atilde;o.';
 	elsif prm_status = 'CANCELADO'  then 	ws_cor := '#F2142B';   ws_hint := 'Cancelado.';
 	elsif prm_status = 'ALERTA'     then 	ws_cor := '#F6C21A';   ws_hint := 'Conclu&iacute;do com alerta para poss&iacute;vel erro no retorno obtido pelo Agente.';
+
 	end if; 
 	ws_status := prm_status;
 	if prm_status = 'ALERTA' then 
@@ -476,12 +479,12 @@ begin
 				ws_erro := nvl(ws_erro, ws_erro_limpar);
 			end if;	
 			ctb.ctb_atu_status_acao(a.run_acao_id, 'ERRO');
-			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   id_conexao,   comando,         comando_limpar,    tbl_destino,   status,    dt_inicio, erro) 
+			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   id_conexao,   comando,         comando_limpar,    tbl_destino,   status,    dt_criacao, ds_erro) 
 							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, a.id_conexao, ws_comando_blob, ws_comando_limpar, a.tbl_destino, 'ERRO',    sysdate,   ws_erro );
 		else 	
 			ws_comando_blob := ctb.c2b(ws_comando);
 			ctb.ctb_atu_status_acao(a.run_acao_id, 'AGUARDANDO');
-			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   id_conexao,   comando,         comando_limpar,    tbl_destino,    status,      dt_inicio) 
+			insert into ctb_acoes_exec (id_agendamento,    run_acao_id,   id_cliente,   id_acao,   id_conexao,   comando,         comando_limpar,    tbl_destino,    status,      dt_criacao) 
 							    values (ws_id_agendamento, a.run_acao_id, a.id_cliente, a.id_acao, a.id_conexao, ws_comando_blob, ws_comando_limpar, a.tbl_destino, 'AGUARDANDO', sysdate);
     	end if;     
 	end loop; 	
@@ -1730,7 +1733,7 @@ procedure ctb_acoes_exec_list(prm_tp      varchar2,
 					          prm_linhas	varchar2 default '50') as 
 	cursor c1 is  
 		select * from (
-			select ru.ds_run, ra.ordem, ae.id_acao, ae.dt_inicio, ae.dt_final, ae.status, ae.tempo_local, ae.tempo_upload, ae.tempo_processo, ae.erro   
+			select ru.ds_run, ra.ordem, ae.id_acao, ae.dt_criacao, ae.dt_inicio, ae.dt_final, ae.status, ae.tempo_local, ae.tempo_upload, ae.tempo_processo, ae.ds_erro   
 			from ctb_acoes ac, ctb_run_acoes ra, ctb_run ru, ctb_acoes_exec ae 
 			where ac.id_cliente     = ru.id_cliente
 				and ac.id_acao        = ra.id_acao 
@@ -1776,6 +1779,7 @@ begin
 				HTP.P('<th title="Tarefa executada">' 								 ||FUN.LANG('TAREFA')||'</th>');
 				HTP.P('<th title="Ordem da a&ccedil;&atilde;o na tarefa">'           ||FUN.LANG('ORDEM')||'</th>');				
 				HTP.P('<th title="Código da a&ccedil;&atilde;o executada">'          ||FUN.LANG('ID A&Ccedil;&Atilde;O')||'</th>');
+				HTP.P('<th title="Cria&ccedil;&atilde;o da execu&ccedil;&atilde;o da a&ccedil;&atilde;o">'   ||FUN.LANG('CRIA&Ccedil;ÃO')||'</th>');				
 				HTP.P('<th title="Inicio da a&ccedil;&atilde;o">'                    ||FUN.LANG('INICIO')||'</th>');
 				HTP.P('<th title="Fim da a&ccedil;&atilde;o">'                       ||FUN.LANG('FIM')||'</th>');
 				HTP.P('<th title="Situa&ccedil;&atilde;o da a&ccedil;&atilde;o">'    ||FUN.LANG('SITUA&Ccedil;&Atilde;O')||'</th>');				
@@ -1786,11 +1790,12 @@ begin
 
 		htp.p('<tbody id="ajax" >');
 			for a in c1 loop
-				ws_ds_log := replace(fun.html_trans(a.erro),chr(10),'<br>');
+				ws_ds_log := replace(fun.html_trans(a.ds_erro),chr(10),'<br>');
 				htp.p('<tr>');
 					htp.p('<td class="ctb_col_ds_tarefa" style="width: 130px;">   <input disabled title="'||a.ds_run||'" value="'||a.ds_run||'"/></td>');					
 					htp.p('<td class="ctb_col_ordem">                             <input disabled title="'||a.ordem  ||'" value="'||a.ordem||'"/></td>');
 					htp.p('<td class="ctb_col_id_acao" style="width: 130px;">     <input disabled title="'||a.id_acao||'" value="'||a.id_acao||'"/></td>');					
+					htp.p('<td class="ctb_col_dh">                                <input disabled title="'||to_char(a.dt_criacao,'dd/mm/yyyy hh24:mi:ss')||'" value="'||to_char(a.dt_criacao,'dd/mm/yyyy hh24:mi:ss')||'"/></td>');					
 					htp.p('<td class="ctb_col_dh">                                <input disabled title="'||to_char(a.dt_inicio,'dd/mm/yyyy hh24:mi:ss')||'" value="'||to_char(a.dt_inicio,'dd/mm/yyyy hh24:mi:ss')||'"/></td>');
 					htp.p('<td class="ctb_col_dh">                                <input disabled title="'||to_char(a.dt_final,'dd/mm/yyyy hh24:mi:ss')||'" value="'||to_char(a.dt_final,'dd/mm/yyyy hh24:mi:ss')||'"/></td>');
 					htp.p('<td class="ctb_status">'||ctb.prn_a_status(a.status)||'</td>');
@@ -2752,8 +2757,8 @@ begin
 		ws_qt_run_exec := ws_qt_run_exec + ws_count; 
 
 		update ctb_acoes_exec 
-		set status = 'CANCELADO',
-			erro   = 'Execucao cancelada pelo Usuario ['||ws_usuario||']'
+		set status  = 'CANCELADO',
+			ds_erro = 'Execucao cancelada pelo Usuario ['||ws_usuario||']'
 		where run_acao_id = a.run_acao_id 
 		  and status in ('EXECUTANDO','AGUARDANDO') ; 
 

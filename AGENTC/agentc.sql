@@ -322,25 +322,23 @@ procedure request_acao (  p_id_cliente     varchar2 default null,
 begin
 
      begin
-         select agentc.b2c(comando) as comando, run_acao_id 
-           into ws_query, ws_run_acao_id
-           from CTB_ACOES_EXEC
+         select comando, run_acao_id into ws_query, ws_run_acao_id
+           from ctb_acoes_exec
           where id_cliente = p_id_cliente 
             and id_acao    = p_id_acao 
-            and STATUS     = 'AGUARDANDO'
+            and status     = 'AGUARDANDO'
           order by dt_inicio asc
           fetch first 1 rows only;   
      exception when others then
           raise ws_nocheck;
      end;
 
-     htp.p('Erro buscando comando da ação');
-     --htp.p(ws_query);
+     htp.p(ws_query);
 
-     update CTB_ACOES_EXEC set STATUS='EXECUTANDO', CHECK_ID = p_check_id, dt_inicio=sysdate
-     WHERE ID_CLIENTE = p_id_cliente 
-       AND ID_ACAO    = p_id_acao 
-       AND STATUS     = 'AGUARDANDO';
+     update ctb_acoes_exec set status='EXECUTANDO', check_id = p_check_id, dt_inicio=sysdate
+     where id_cliente = p_id_cliente 
+       and id_acao    = p_id_acao 
+       and status     = 'AGUARDANDO';
 
      atu_status_acao ( ws_run_acao_id, 'EXECUTANDO');  -- atualiza status da tarefa no BI 
 
@@ -402,15 +400,15 @@ begin
             and id_acao    = p_id_acao 
             and status     = 'EXECUTANDO';
 
-          update CTB_ACOES_EXEC set STATUS='ERRO', 
-                                   ERRO = substr(p_erro_txt,1,490), 
-                                   DT_FINAL=sysdate, 
-                                   TEMPO_LOCAL=0,
-                                   TEMPO_UPLOAD=0,
-                                   TEMPO_PROCESSO=0
-          WHERE ID_CLIENTE = p_id_cliente 
-            AND ID_ACAO    = p_id_acao 
-            AND STATUS     = 'EXECUTANDO';
+          update ctb_acoes_exec set status       = 'ERRO', 
+                                   ds_erro       = substr(p_erro_txt,1,490), 
+                                   dt_final      = sysdate, 
+                                   tempo_local   = 0,
+                                   tempo_upload  = 0,
+                                   tempo_processo= 0
+          where id_cliente = p_id_cliente 
+            and id_acao    = p_id_acao 
+            and status     = 'EXECUTANDO';
 
           if ws_run_acao_id is not null then 
                atu_status_acao ( ws_run_acao_id, 'ERRO' );  -- atualiza status da tarefa no BI 
