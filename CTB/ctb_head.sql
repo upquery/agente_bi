@@ -111,7 +111,7 @@ procedure ctb_acoes_exec_list(prm_tp      varchar2,
                               prm_id      varchar2,
 					          prm_linhas	varchar2 default '50') ; 
 
-procedure tmp_docs_list (prm_id_cliente   varchar2,
+procedure ctb_docs_list (prm_id_cliente   varchar2,
                          prm_id_acao      varchar2,
 					     prm_linhas	      varchar2 default '50') ; 
 

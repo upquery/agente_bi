@@ -471,6 +471,7 @@ procedure upload ( p_documento      IN  varchar2 default null,
      ws_sysdate          date;
      ws_status           varchar2(20);
      ws_status_acao      varchar2(20);
+     ws_id_agendamento   varchar2(40); 
      ws_erro             varchar2(100); 
      ws_dt_aux           date;   
 
@@ -481,7 +482,7 @@ begin
      ws_erro    := null; 
 
      select count(*), max(last_updated) into ws_count, ws_dt_aux  
-     from tmp_docs
+     from ctb_docs
      where id_cliente   = p_id_cliente
        and check_id     = p_check_id
        and id_acao      = p_id_acao
@@ -491,7 +492,7 @@ begin
           ws_erro   := 'Arquivo enviado em duplicidade pelo Agente'; 
      end if; 
 
-     select nvl(max(status),'N/A') into ws_status_acao
+     select nvl(max(status),'N/A'), nvl(max(id_agendamento),'0') into ws_status_acao, ws_id_agendamento 
      from ctb_acoes_exec 
      where id_cliente = p_id_cliente
        and check_id   = p_check_id 
@@ -501,12 +502,13 @@ begin
           ws_status := 'CANCELADO';
      end if;    
 
-     update tmp_docs set id_cliente   = p_id_cliente,
-                         check_id     = p_check_id,
-                         id_acao      = p_id_acao,
-                         last_updated = ws_sysdate,
-                         status       = ws_status,
-                         erro         = ws_erro 
+     update ctb_docs set id_cliente     = p_id_cliente,
+                         check_id       = p_check_id,
+                         id_acao        = p_id_acao,
+                         id_agendamento = ws_id_agendamento,
+                         last_updated   = ws_sysdate,
+                         status         = ws_status,
+                         ds_erro        = ws_erro 
      where name = p_documento;
 
      htp.p('OK=['||p_id_acao||']');

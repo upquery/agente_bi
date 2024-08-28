@@ -1499,7 +1499,7 @@ begin
 					htp.p('</td>');
 
 					htp.p('<td class="ctb_atalho" title="Log do processo de atualiza&ccedil;&atilde;o das tabelas de destino." '||
-					      ' onclick="carregaTelasup(''tmp_docs_list'', ''prm_id_cliente='||a.id_cliente||'&prm_id_acao='||a.id_acao||''', ''CTB'', ''none'','''','''',''ctb_acoes_list|prm_id_cliente='||a.id_cliente||'&prm_id_acao='||prm_id_acao||'|CTB|ctb_acoes|||'');">');
+					      ' onclick="carregaTelasup(''ctb_docs_list'', ''prm_id_cliente='||a.id_cliente||'&prm_id_acao='||a.id_acao||''', ''CTB'', ''none'','''','''',''ctb_acoes_list|prm_id_cliente='||a.id_cliente||'&prm_id_acao='||prm_id_acao||'|CTB|ctb_acoes|||'');">');
 						htp.p('<svg viewBox="0 0 600 600" xml:space="preserve"><g><path d="M486.201,196.124h-13.166V132.59c0-0.396-0.062-0.795-0.115-1.196c-0.021-2.523-0.825-5-2.552-6.963L364.657,3.677 c-0.033-0.031-0.064-0.042-0.085-0.073c-0.63-0.707-1.364-1.292-2.143-1.795c-0.229-0.157-0.461-0.286-0.702-0.421 c-0.672-0.366-1.387-0.671-2.121-0.892c-0.2-0.055-0.379-0.136-0.577-0.188C358.23,0.118,357.401,0,356.562,0H96.757 C84.894,0,75.256,9.651,75.256,21.502v174.613H62.092c-16.971,0-30.732,13.756-30.732,30.733v159.812 c0,16.968,13.761,30.731,30.732,30.731h13.164V526.79c0,11.854,9.638,21.501,21.501,21.501h354.776 c11.853,0,21.501-9.647,21.501-21.501V417.392h13.166c16.966,0,30.729-13.764,30.729-30.731V226.854 C516.93,209.872,503.167,196.124,486.201,196.124z M96.757,21.502h249.054v110.009c0,5.939,4.817,10.75,10.751,10.75h94.972v53.861 H96.757V21.502z M317.816,303.427c0,47.77-28.973,76.746-71.558,76.746c-43.234,0-68.531-32.641-68.531-74.152 c0-43.679,27.887-76.319,70.906-76.319C293.389,229.702,317.816,263.213,317.816,303.427z M82.153,377.79V232.085h33.073v118.039 h57.944v27.66H82.153V377.79z M451.534,520.962H96.757v-103.57h354.776V520.962z M461.176,371.092 c-10.162,3.454-29.402,8.209-48.641,8.209c-26.589,0-45.833-6.698-59.24-19.664c-13.396-12.535-20.75-31.568-20.529-52.967 c0.214-48.436,35.448-76.108,83.229-76.108c18.814,0,33.292,3.688,40.431,7.139l-6.92,26.37 c-7.999-3.457-17.942-6.268-33.942-6.268c-27.449,0-48.209,15.567-48.209,47.134c0,30.049,18.807,47.771,45.831,47.771 c7.564,0,13.623-0.852,16.21-2.152v-30.488h-22.478v-25.723h54.258V371.092L461.176,371.092z"></path><path d="M212.533,305.37c0,28.535,13.407,48.64,35.452,48.64c22.268,0,35.021-21.186,35.021-49.5 c0-26.153-12.539-48.655-35.237-48.655C225.504,255.854,212.533,277.047,212.533,305.37z"></path></g></svg>');
 					htp.p('</td>');
 
@@ -1812,13 +1812,13 @@ begin
 end ctb_acoes_exec_list;  
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-procedure tmp_docs_list (prm_id_cliente   varchar2,
+procedure ctb_docs_list (prm_id_cliente   varchar2,
                          prm_id_acao      varchar2,
 					     prm_linhas	      varchar2 default '50') as 
 	cursor c1 is  
 		select * from (
-			select name, id_acao, doc_size, last_updated, status, erro, blob_content     
-			from tmp_docs tm
+			select name, id_acao, doc_size, last_updated, status, ds_erro, blob_content     
+			from ctb_docs tm
 			where id_cliente = prm_id_cliente 
 			  and id_acao    = prm_id_acao 
 			order by last_updated desc 
@@ -1834,7 +1834,7 @@ begin
 
 	htp.p('<div id="searchbar" data-stop="S">');
 		htp.p('<label>Filtrar linhas</label>');
-		htp.p('<select id="searchbar" onchange="carregaTelasup(''tmp_docs_list'', ''prm_id_cliente='||prm_id_cliente||'&prm_id_acao='||prm_id_acao||'&prm_linhas=''+this.value, ''CTB'', ''none'','''','''','''');">');
+		htp.p('<select id="searchbar" onchange="carregaTelasup(''ctb_docs_list'', ''prm_id_cliente='||prm_id_cliente||'&prm_id_acao='||prm_id_acao||'&prm_linhas=''+this.value, ''CTB'', ''none'','''','''','''');">');
 			for a in (select '50'    id, '50 linhas'  ds from dual union all
 					  select '100'   id, '100 linhas' ds from dual union all
 					  select '250'   id, '250 linhas' ds from dual union all
@@ -1850,7 +1850,7 @@ begin
 	htp.p('</div>');
 
 
-	htp.p('<input type="hidden" id="content-atributos" data-refresh="tmp_docs_list" data-refresh-ativo="S" data-pkg="ctb" data-par-col="prm_id_cliente|prm_id_acao|prm_linhas" data-par-val="'||prm_id_cliente||'|'||prm_id_acao||'|'||prm_linhas||'">');
+	htp.p('<input type="hidden" id="content-atributos" data-refresh="ctb_docs_list" data-refresh-ativo="S" data-pkg="ctb" data-par-col="prm_id_cliente|prm_id_acao|prm_linhas" data-par-val="'||prm_id_cliente||'|'||prm_id_acao||'|'||prm_linhas||'">');
 
 	htp.p('<h2>LOG DE ATUALIZA&Ccedil;&Atilde;O DAS TABELAS DE DESTINO</h2>');
 
@@ -1868,7 +1868,7 @@ begin
 
 		htp.p('<tbody id="ajax" >');
 			for a in c1 loop
-				ws_ds_log    := replace(fun.html_trans(a.erro),chr(10),'<br>');
+				ws_ds_log    := replace(fun.html_trans(a.ds_erro),chr(10),'<br>');
 				ws_dados_doc := ctb.b2c(a.blob_content);
 				ws_dados_doc := substr(ws_dados_doc,1,2000);
 				ws_dados_doc := replace(fun.html_trans(ws_dados_doc),chr(10),'<br>')||' ...';
@@ -1896,9 +1896,9 @@ exception
 	when others then 	
 		ws_erro	:= 'Erro montando tela, verique o log de erros do sistema.';
 		htp.p('ERRO|'||ws_erro);
-    	insert into bi_log_sistema values(sysdate, 'tmp_docs_list (others) :'||DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, gbl.getusuario, 'ERRO');
+    	insert into bi_log_sistema values(sysdate, 'ctb_docs_list (others) :'||DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE, gbl.getusuario, 'ERRO');
 		commit;	
-end tmp_docs_list;  
+end ctb_docs_list;  
 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2483,7 +2483,7 @@ begin
 					htp.p('</td>');
 
 					htp.p('<td class="ctb_atalho" title="Log do processo de atualiza&ccedil;&atilde;o das tabelas de destino." '||
-					      ' onclick="carregaTelasup(''tmp_docs_list'', ''prm_id_cliente='||a.id_cliente||'&prm_id_acao='||a.id_acao||''', ''CTB'', ''none'','''','''',''ctb_run_acoes_list|prm_run_id='||prm_run_id||'|CTB|ctb_run_acoes|||'');">');
+					      ' onclick="carregaTelasup(''ctb_docs_list'', ''prm_id_cliente='||a.id_cliente||'&prm_id_acao='||a.id_acao||''', ''CTB'', ''none'','''','''',''ctb_run_acoes_list|prm_run_id='||prm_run_id||'|CTB|ctb_run_acoes|||'');">');
 						htp.p('<svg viewBox="0 0 600 600" xml:space="preserve"><g><path d="M486.201,196.124h-13.166V132.59c0-0.396-0.062-0.795-0.115-1.196c-0.021-2.523-0.825-5-2.552-6.963L364.657,3.677 c-0.033-0.031-0.064-0.042-0.085-0.073c-0.63-0.707-1.364-1.292-2.143-1.795c-0.229-0.157-0.461-0.286-0.702-0.421 c-0.672-0.366-1.387-0.671-2.121-0.892c-0.2-0.055-0.379-0.136-0.577-0.188C358.23,0.118,357.401,0,356.562,0H96.757 C84.894,0,75.256,9.651,75.256,21.502v174.613H62.092c-16.971,0-30.732,13.756-30.732,30.733v159.812 c0,16.968,13.761,30.731,30.732,30.731h13.164V526.79c0,11.854,9.638,21.501,21.501,21.501h354.776 c11.853,0,21.501-9.647,21.501-21.501V417.392h13.166c16.966,0,30.729-13.764,30.729-30.731V226.854 C516.93,209.872,503.167,196.124,486.201,196.124z M96.757,21.502h249.054v110.009c0,5.939,4.817,10.75,10.751,10.75h94.972v53.861 H96.757V21.502z M317.816,303.427c0,47.77-28.973,76.746-71.558,76.746c-43.234,0-68.531-32.641-68.531-74.152 c0-43.679,27.887-76.319,70.906-76.319C293.389,229.702,317.816,263.213,317.816,303.427z M82.153,377.79V232.085h33.073v118.039 h57.944v27.66H82.153V377.79z M451.534,520.962H96.757v-103.57h354.776V520.962z M461.176,371.092 c-10.162,3.454-29.402,8.209-48.641,8.209c-26.589,0-45.833-6.698-59.24-19.664c-13.396-12.535-20.75-31.568-20.529-52.967 c0.214-48.436,35.448-76.108,83.229-76.108c18.814,0,33.292,3.688,40.431,7.139l-6.92,26.37 c-7.999-3.457-17.942-6.268-33.942-6.268c-27.449,0-48.209,15.567-48.209,47.134c0,30.049,18.807,47.771,45.831,47.771 c7.564,0,13.623-0.852,16.21-2.152v-30.488h-22.478v-25.723h54.258V371.092L461.176,371.092z"></path><path d="M212.533,305.37c0,28.535,13.407,48.64,35.452,48.64c22.268,0,35.021-21.186,35.021-49.5 c0-26.153-12.539-48.655-35.237-48.655C225.504,255.854,212.533,277.047,212.533,305.37z"></path></g></svg>');
 					htp.p('</td>');
 
@@ -2762,15 +2762,15 @@ begin
 		where run_acao_id = a.run_acao_id 
 		  and status in ('EXECUTANDO','AGUARDANDO') ; 
 
-		select count(*) into ws_count from tmp_docs 
+		select count(*) into ws_count from ctb_docs 
 		where id_cliente   = a.id_cliente 
 			and id_acao    = a.id_acao 
 			and status     = 'EXECUTANDO'; 
 		ws_qt_run_doc := ws_qt_run_doc + ws_count; 	
 
-		update tmp_docs 
-			set status = 'CANCELADO', 
-				erro   = 'Execucao cancelada pelo Usuario ['||ws_usuario||']'
+		update ctb_docs 
+			set status  = 'CANCELADO', 
+				ds_erro = 'Execucao cancelada pelo Usuario ['||ws_usuario||']'
 		where id_cliente   = a.id_cliente 
 			and id_acao    = a.id_acao 
 			and status     = 'WAITING'; 

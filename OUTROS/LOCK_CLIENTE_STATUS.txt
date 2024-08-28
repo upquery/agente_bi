@@ -1,0 +1,18 @@
+create or replace PROCEDURE LOCK_CLIENTE_STATUS (prm_cliente varchar2   default null, prm_status varchar2 default 'I') AS 
+begin
+    begin
+        update LOCK_CLIENTE 
+           set status   = prm_status,
+               dt_begin = decode(prm_status,'A',sysdate,dt_begin),
+               dt_end   = decode(prm_status,'I',sysdate, null)
+        where id_cliente = prm_cliente; 
+        if sql%notfound then 
+            insert into lock_cliente (id_cliente, status, dt_begin, dt_end) values (prm_cliente, prm_status, decode(prm_status,'A',sysdate,null), null ); 
+        end if; 
+    exception when others then 
+        update LOCK_CLIENTE 
+           set status   = nvl(prm_status,'I')
+         where id_cliente = prm_cliente;     
+    end;     
+    commit; 
+end;
