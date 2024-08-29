@@ -10,11 +10,11 @@ create or replace package body CTB  is
        order by 1 ;
 
     cursor c_param_destino is 
-        select 01 ordem, 'HOST'          cd, 'HOST'         ds from dual union all         
-		select 02 ordem, 'PORTA'         cd, 'PORTA'        ds from dual union all         
-        select 03 ordem, 'USUARIO'       cd, 'USUARIO'      ds from dual union all         
-        select 04 ordem, 'SENHA'         cd, 'SENHA'        ds from dual union all         
-        select 05 ordem, 'SERVICE_NAME'  cd, 'NOME SERVIÇO' ds from dual 
+        select 01 ordem, 'HOST'          cd, 'HOST'          ds from dual union all         
+		select 02 ordem, 'PORTA'         cd, 'PORTA'         ds from dual union all         
+        select 03 ordem, 'USUARIO'       cd, 'USUARIO'       ds from dual union all         
+        select 04 ordem, 'SENHA'         cd, 'SENHA'         ds from dual union all         
+        select 05 ordem, 'SERVICE_NAME'  cd, 'NOME SERVICO'  ds from dual 
        order by 1 ;
 
 
@@ -508,7 +508,7 @@ exception
         commit;
 	when others then 	
 		rollback; 
-		prm_retorno := 'Erro iniciando a execução, verifique o log de erros do sistema';
+		prm_retorno := 'Erro iniciando a execu&ccedil;ão, verifique o log de erros do sistema';
 		insert into bi_log_sistema (dt_log, ds_log, nm_usuario, nm_procedure) values (sysdate , 'ctb.exec_run('||prm_run_id||') erro: '||substr(dbms_utility.format_error_stack||dbms_utility.format_error_backtrace,1,3900), 'DWU', 'ERRO');
         commit;
 end exec_run; 
@@ -1782,11 +1782,11 @@ begin
 				HTP.P('<th title="Tarefa executada">' 								 ||FUN.LANG('TAREFA')||'</th>');
 				HTP.P('<th title="Ordem da a&ccedil;&atilde;o na tarefa">'           ||FUN.LANG('ORDEM')||'</th>');				
 				HTP.P('<th title="Código da a&ccedil;&atilde;o executada">'          ||FUN.LANG('ID A&Ccedil;&Atilde;O')||'</th>');
-				HTP.P('<th title="Cria&ccedil;&atilde;o da execu&ccedil;&atilde;o da a&ccedil;&atilde;o">'   ||FUN.LANG('CRIA&Ccedil;ÃO')||'</th>');				
+				HTP.P('<th title="Cria&ccedil;&atilde;o da execu&ccedil;&atilde;o da a&ccedil;&atilde;o">'   ||FUN.LANG('CRIA&Ccedil;&Atilde;O')||'</th>');				
 				HTP.P('<th title="Inicio da a&ccedil;&atilde;o">'                    ||FUN.LANG('INICIO EXTRA&Ccedil;&Atilde;O')||'</th>');
 				HTP.P('<th title="Fim da a&ccedil;&atilde;o">'                       ||FUN.LANG('FIM EXTRA&Ccedil;&Atilde;O')||'</th>');
-				HTP.P('<th title="Inicio da inserção.">'         		             ||FUN.LANG('INICIO INSER&Ccedil;&Atilde;O')||'</th>');
-				HTP.P('<th title="Fim da inserção">'                      			 ||FUN.LANG('FIM INSER&Ccedil;&Atilde;O')||'</th>');
+				HTP.P('<th title="Inicio da inser&ccedil;&atilde;o.">'               ||FUN.LANG('INICIO INSER&Ccedil;&Atilde;O')||'</th>');
+				HTP.P('<th title="Fim da inser&ccedil;&atilde;o">'            		 ||FUN.LANG('FIM INSER&Ccedil;&Atilde;O')||'</th>');
 				HTP.P('<th title="Situa&ccedil;&atilde;o da a&ccedil;&atilde;o">'    ||FUN.LANG('SITUA&Ccedil;&Atilde;O')||'</th>');				
 				HTP.P('<th title="Descri&ccedil;&atilde;o Erro">'                    ||FUN.LANG('ERRO EXECU&Ccedil;&Atilde;O')||'</th>');
 				HTP.P('<th></th>');
@@ -1825,7 +1825,7 @@ procedure ctb_docs_list (prm_id_cliente   varchar2,
 					     prm_linhas	      varchar2 default '50') as 
 	cursor c1 is  
 		select * from (
-			select name, id_acao, doc_size, last_updated, status, ds_erro, blob_content     
+			select name, id_acao, doc_size, last_updated, status, ds_erro, blob_content, dt_inicio, dt_fim     
 			from ctb_docs tm
 			where id_cliente = prm_id_cliente 
 			  and id_acao    = prm_id_acao 
@@ -1865,9 +1865,11 @@ begin
 	htp.p('<table class="linha">');
 		htp.p('<thead>');
 			htp.p('<tr>');
-				HTP.P('<th title="Nome do arquivo de dados">' 								 ||FUN.LANG('NOME')||'</th>');
-				HTP.P('<th title="Tamando do arquivo de dados em bytes">'   	             ||FUN.LANG('TAMANHO')||'</th>');				
-				HTP.P('<th title="Data e hora da &uacute;ltima atualiza&ccedil;&atilde;o">'  ||FUN.LANG('&Uacute;LTIMA EXEC.')||'</th>');
+				HTP.P('<th title="Nome do arquivo de dados">' 						 ||FUN.LANG('NOME')||'</th>');
+				HTP.P('<th title="Tamando do arquivo de dados em bytes">'            ||FUN.LANG('TAMANHO')||'</th>');
+				HTP.P('<th title="Data e hora da recep&ccedil;&atilde;o dos dados">' ||FUN.LANG('RECEP&Ccedil;&Atilde;O')||'</th>');
+				HTP.P('<th title="Inicio da inser&ccedil;&atilde;o.">'               ||FUN.LANG('INICIO INSER&Ccedil;&Atilde;O')||'</th>');
+				HTP.P('<th title="Fim da inser&ccedil;&atilde;o">'            		 ||FUN.LANG('FIM INSER&Ccedil;&Atilde;O')||'</th>');
 				HTP.P('<th title="Situa&ccedil;&atilde;o da a&ccedil;&atilde;o">'    ||FUN.LANG('SITUA&Ccedil;&Atilde;O')||'</th>');				
 				HTP.P('<th title="Descri&ccedil;&atilde;o Erro">'                    ||FUN.LANG('ERRO EXECU&Ccedil;&Atilde;O')||'</th>');
 				HTP.P('<th></th>');
@@ -1884,6 +1886,8 @@ begin
 					htp.p('<td class="ctb_col_ds_acao" style="width: 130px;">     <input disabled title="'||a.name||'" value="'||a.name||'"/></td>');					
 					htp.p('<td class="ctb_col_tamanho">   	   				      <input disabled title="'||a.doc_size||'" value="'||a.doc_size||'"/></td>');					
 					htp.p('<td class="ctb_col_dh">                                <input disabled title="'||to_char(a.last_updated,'dd/mm/yyyy hh24:mi:ss')||'" value="'||to_char(a.last_updated,'dd/mm/yyyy hh24:mi:ss')||'"/></td>');
+					htp.p('<td class="ctb_col_dh">                                <input disabled title="'||to_char(a.dt_inicio,'dd/mm/yyyy hh24:mi:ss')||'" value="'||to_char(a.dt_inicio,'dd/mm/yyyy hh24:mi:ss')||'"/></td>');
+					htp.p('<td class="ctb_col_dh">                                <input disabled title="'||to_char(a.dt_fim,   'dd/mm/yyyy hh24:mi:ss')||'" value="'||to_char(a.dt_fim,   'dd/mm/yyyy hh24:mi:ss')||'"/></td>');										
 					htp.p('<td class="ctb_status">'||ctb.prn_a_status(a.status)||'</td>');
 					htp.p('<td>'); 
 						htp.p('<input class="zoom_column" readonly value="'||ws_ds_log||'" onclick="modal_txt_sup(event,this.value);"/>'); 
