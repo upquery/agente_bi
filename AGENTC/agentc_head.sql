@@ -1,7 +1,9 @@
 create or replace package     agentc is
 
---     procedure request_server (  p_id_cliente      varchar2 default null,
---	                             p_check_id        varchar2 default null );
+     function chk_cliente (      p_id_cliente      varchar2,
+	                             p_check_id        varchar2 ) return boolean;
+    function chk_registro ( p_id_cliente    varchar2,
+	                        p_tp_registro   varchar2 ) return boolean ;
 
 	 procedure request_begin (   p_id_cliente      varchar2 default null,
                                  p_check_id        varchar2 default null,
@@ -42,9 +44,6 @@ create or replace package     agentc is
      procedure uptest (          p_documento       IN varchar2 default null);
 
 
-     function chk_cliente (      p_id_cliente      varchar2,
-	                             p_check_id        varchar2 ) return boolean;
-
      procedure error_domweb (
                                  p_id_cliente      varchar2 DEFAULT NULL,
                                  p_nm_arquivo      varchar2 DEFAULT NULL,
@@ -54,7 +53,5 @@ create or replace package     agentc is
                                 prm_status        varchar2 ) ; 
     
     function send_id return varchar2;
-
-    FUNCTION B2C(P_BLOB BLOB) RETURN CLOB;
 
 end agentc;

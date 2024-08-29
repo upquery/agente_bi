@@ -1,5 +1,44 @@
 create or replace package body     agentc is
 
+function chk_cliente ( p_id_cliente     varchar2,
+	                   p_check_id       varchar2 ) return boolean as
+     ws_check            number;
+     ws_retorno          boolean;
+     ws_nocheck          exception;
+begin
+     ws_retorno := true;
+     begin
+          select count(*) into ws_check from CTB_CLIENTES
+          where id_cliente = p_id_cliente 
+            and check_id   = p_check_id;
+
+          if  ws_check <> 1 then
+               ws_retorno := false;
+               raise ws_nocheck;   -- Força erro 
+          end if;
+     exception when others then
+          ws_retorno := true;
+     end;
+     ws_retorno := true;
+     return(ws_retorno);
+end chk_cliente;
+
+
+function chk_registro ( p_id_cliente    varchar2,
+	                   p_tp_registro   varchar2 ) return boolean as
+     ws_check            number;
+begin
+     select count(*) into ws_check from CTB_REGISTRO where id_cliente = p_id_cliente and tp_registro = p_tp_registro;
+     if  ws_check = 0 then
+          return false; 
+     else 
+          return true;      
+     end if;
+end chk_registro;
+
+
+
+
 procedure request_begin (  p_id_cliente     varchar2 default null,
                            p_check_id       varchar2 default null,
                            p_versao         varchar2 default null ) as
@@ -92,7 +131,7 @@ begin
      end;
 
      update CTB_CLIENTES set check_id = ws_chave_final, dt_ultima_com = sysdate where id_cliente = p_id_cliente;
-     insert into CTB_REGISTRO values (p_id_cliente,sysdate,'BEGIN',null,ws_chave_final,p_versao);
+     insert into CTB_REGISTRO (id_cliente, tp_registro, dt_inicio, check_id, cd_versao) values (p_id_cliente,'BEGIN',sysdate,ws_chave_final,p_versao);
      commit;
 
      htp.p(ws_chave_final);
@@ -134,21 +173,14 @@ begin
           raise ws_nocheck;
      end if;
 
-     begin
-          select count(*) into ws_check from   CTB_REGISTRO
-          where id_cliente = p_id_cliente 
-            and tp_registro = 'BEGIN';
-          if  ws_check = 0 then
-               raise ws_nocheck;
-          end if;
-     exception when others then
-          raise ws_nocheck;  -- Força erro 
-     end;
+     if  not chk_registro(p_id_cliente,'BEGIN') then
+          raise ws_nocheck;
+     end if;
 
      begin
           update CTB_CLIENTES set dt_ultima_com = sysdate where  id_cliente = p_id_cliente;
 
-          update CTB_REGISTRO set tp_registro = 'END', dt_final = sysdate
+          update CTB_REGISTRO set tp_registro = 'END', dt_fim = sysdate
           where id_cliente  = p_id_cliente 
             and check_id    = p_check_id 
             and tp_registro = 'BEGIN';
@@ -173,143 +205,107 @@ procedure acao_end (      p_id_cliente      varchar2 default null,
                           p_second_upload   varchar2 default null,
                           p_second_processo varchar2 default null) as
 
-	    ws_chave_final      varchar2(100);
-        ws_ant_chave        varchar2(100);
-        ws_chave            varchar2(100);
-        ws_tempo            varchar2(100);
-        ws_check            number;
-        ws_query            varchar2(4000);
+     ws_chave_final      varchar2(100);
+     ws_ant_chave        varchar2(100);
+     ws_chave            varchar2(100);
+     ws_tempo            varchar2(100);
+     ws_check            number;
+     ws_query            varchar2(4000);
 
-        ws_nocheck          exception;
-        ws_fase             varchar2(3000);
+     ws_nocheck          exception;
+     ws_fase             varchar2(3000);
 
-	begin
+begin
 
-        if  not chk_cliente(p_id_cliente,p_check_id) then
-            ws_fase := 'CHECK_ID:';
-            raise ws_nocheck;
-        end if;
+     if  not chk_cliente(p_id_cliente,p_check_id) then
+          ws_fase := 'CHECK_ID:';
+          raise ws_nocheck;
+     end if;
 
-        begin
-             select count(*) into ws_check
-             from   CTB_REGISTRO
-             where  CTB_REGISTRO.id_cliente = p_id_cliente and
-                    CTB_REGISTRO.tp_registro = 'BEGIN';
-             if  ws_check = 0 then
-                 ws_fase := 'CTB_REGISTRO:';
-                 raise ws_nocheck;
-             end if;
-        exception
-             when others then
-                  raise ws_nocheck;
-        end;
+     if  not chk_registro(p_id_cliente,'BEGIN') then
+          ws_fase := 'CTB_REGISTRO:';
+          raise ws_nocheck;
+     end if;
 
-        begin
-             update CTB_ACOES_EXEC set STATUS='CONCLUIDO', 
-                                       DT_FINAL=sysdate, 
-                                       TEMPO_LOCAL=p_second,
-                                       TEMPO_UPLOAD=p_second_upload,
-                                       TEMPO_PROCESSO=p_second_processo
-             WHERE ID_CLIENTE = p_id_cliente 
-               AND ID_ACAO    = p_id_acao 
-               AND STATUS     = 'EXECUTANDO';
-             COMMIT;
-        exception
-             when others then
-                  ws_fase := 'CTB_ACOES_EXEC:';
-                  raise ws_nocheck;
-        end;
+     begin
+          update ctb_acoes_exec 
+             set status         = 'CONCLUIDO', 
+                 dt_fim         = sysdate, 
+                 tempo_local    = p_second,
+                 tempo_upload   = p_second_upload,
+                 tempo_processo = p_second_processo
+          where id_cliente = p_id_cliente 
+          and id_acao      = p_id_acao 
+          and status       = 'EXTRAINDO';
+          COMMIT;
+     exception when others then
+          ws_fase := 'CTB_ACOES_EXEC:';
+          raise ws_nocheck;
+     end;
 
-        htp.p('OK');
+     htp.p('OK');
 
-    exception
-         when others then
-               ws_query := SQLERRM;
-               insert into CTB_ERROS (id_cliente, check_id, id_acao, nm_processo, dt_erro, ds_erro) values( p_id_cliente, p_check_id, p_id_acao, 'ACAO_END', sysdate, ws_fase||trim(ws_query));
-               commit;
-               htp.p('OK');
-
+exception
+     when others then
+          ws_query := SQLERRM;
+          insert into CTB_ERROS (id_cliente, check_id, id_acao, nm_processo, dt_erro, ds_erro) values( p_id_cliente, p_check_id, p_id_acao, 'ACAO_END', sysdate, ws_fase||trim(ws_query));
+          commit;
+          htp.p('OK');
 end acao_end;
+
+
 
 procedure request_con (  p_id_cliente     varchar2 default null,
 	                     p_check_id       varchar2 default null ) as
 
-	    ws_chave_final      varchar2(100);
-        ws_ant_chave        varchar2(100);
-        ws_chave            varchar2(100);
-        ws_tempo            varchar2(100);
-        ws_check            number;
+     ws_chave_final      varchar2(100);
+     ws_ant_chave        varchar2(100);
+     ws_chave            varchar2(100);
+     ws_tempo            varchar2(100);
+     ws_check            number;
+     ws_nocheck          exception;
+begin
 
-        ws_nocheck          exception;
+     if  not chk_cliente(p_id_cliente,p_check_id) then
+          raise ws_nocheck;
+     end if;
+     if  not chk_registro(p_id_cliente,'BEGIN') then
+          raise ws_nocheck;
+     end if;
 
-	begin
+     for i in (select ID_CONEXAO, CD_PARAMETRO, CONTEUDO from CTB_CONEXOES where ID_CLIENTE = p_id_cliente) loop
+          htp.p(i.ID_CONEXAO||'|'||i.CD_PARAMETRO||'|'||i.CONTEUDO||'|');
+     end loop;
 
-        if  not chk_cliente(p_id_cliente,p_check_id) then
-            raise ws_nocheck;
-        end if;
-        begin
-             select count(*) into ws_check
-             from   CTB_REGISTRO
-             where  CTB_REGISTRO.id_cliente = p_id_cliente and
-                    CTB_REGISTRO.tp_registro = 'BEGIN';
-             if  ws_check = 0 then
-                 raise ws_nocheck;
-             end if;
-        exception
-             when others then
-                  raise ws_nocheck;
-        end;
-
-		for i in (select ID_CONEXAO, CD_PARAMETRO, CONTEUDO from CTB_CONEXOES where ID_CLIENTE = p_id_cliente) loop
-              htp.p(i.ID_CONEXAO||'|'||i.CD_PARAMETRO||'|'||i.CONTEUDO||'|');
-		end loop;
-
-    exception
-         when others
-              then ws_check := 1/0;
+exception when others then 
+     ws_check := 1/0;  -- Força erro 
 end request_con;
 
 
 procedure request_list (  p_id_cliente     varchar2 default null,
-	                      p_check_id       varchar2 default null ) as
+	                     p_check_id       varchar2 default null ) as
+     ws_check            number;
+     ws_nocheck          exception;
+begin
+     if  not chk_cliente(p_id_cliente,p_check_id) then
+          raise ws_nocheck;
+     end if;
 
+     if  not chk_registro(p_id_cliente,'BEGIN') then
+          raise ws_nocheck;
+     end if;
 
-	    ws_chave_final      varchar2(100);
-        ws_ant_chave        varchar2(100);
-        ws_chave            varchar2(100);
-        ws_tempo            varchar2(100);
-        ws_check            number;
+     for i in (select ID_CONEXAO, ID_ACAO, NULL ST_BYPASS, NULL CONTEUDO_ENVIO from CTB_ACOES_EXEC 
+               where ID_CLIENTE = p_id_cliente 
+                 and STATUS in ('AGUARDANDO','EXTRAINDO') ) loop
+          htp.p(i.ID_ACAO||'|'||i.ID_CONEXAO||'|'||i.ID_ACAO||'|'||i.ST_BYPASS||'|'||I.CONTEUDO_ENVIO);
+     end loop;
 
-        ws_nocheck          exception;
-
-	begin
-        if  not chk_cliente(p_id_cliente,p_check_id) then
-            raise ws_nocheck;
-        end if;
-
-        begin
-             select count(*) into ws_check
-             from   CTB_REGISTRO
-             where  CTB_REGISTRO.id_cliente = p_id_cliente 
-               and  CTB_REGISTRO.tp_registro = 'BEGIN';
-             if  ws_check = 0 then
-                 raise ws_nocheck;
-             end if;
-        exception
-             when others then
-                  raise ws_nocheck;
-        end;
-
-	   for i in (select ID_CONEXAO, ID_ACAO, NULL ST_BYPASS, NULL CONTEUDO_ENVIO from CTB_ACOES_EXEC 
-                   where ID_CLIENTE = p_id_cliente 
-                     and STATUS in ('AGUARDANDO','EXECUTANDO') ) loop
-            htp.p(i.ID_ACAO||'|'||i.ID_CONEXAO||'|'||i.ID_ACAO||'|'||i.ST_BYPASS||'|'||I.CONTEUDO_ENVIO);
-	   end loop;
-
-    exception
-         when others
-              then ws_check := 1/0;
+exception
+     when others then 
+          ws_check := 1/0;  -- força erro 
 end request_list;
+
 
 procedure request_acao (  p_id_cliente     varchar2 default null,
 	                     p_check_id       varchar2 default null,
@@ -318,7 +314,6 @@ procedure request_acao (  p_id_cliente     varchar2 default null,
      ws_query            clob;
      ws_run_acao_id      number; 
      ws_nocheck          exception;
-
 begin
 
      begin
@@ -335,12 +330,12 @@ begin
 
      htp.p(ws_query);
 
-     update ctb_acoes_exec set status='EXECUTANDO', check_id = p_check_id, dt_inicio=sysdate
+     update ctb_acoes_exec set status='EXTRAINDO', check_id = p_check_id, dt_inicio=sysdate
      where id_cliente = p_id_cliente 
        and id_acao    = p_id_acao 
        and status     = 'AGUARDANDO';
 
-     atu_status_acao ( ws_run_acao_id, 'EXECUTANDO');  -- atualiza status da tarefa no BI 
+     atu_status_acao ( ws_run_acao_id, 'EXTRAINDO');  -- atualiza status da tarefa no BI 
 
      COMMIT;
 
@@ -355,42 +350,26 @@ procedure put_error (p_id_cliente     varchar2 default null,
 	                p_check_id       varchar2 default null,
                      p_id_acao        varchar2 default null,
                      p_erro_txt       varchar2 default null ) as
-
-     ws_chave_final      varchar2(100);
-     ws_ant_chave        varchar2(100);
-     ws_chave            varchar2(100);
-     ws_tempo            varchar2(100);
      ws_check            number;
-     ws_query            varchar2(4000);
+     ws_erro            varchar2(4000);
      ws_run_acao_id      number;
-
      ws_nocheck          exception;
 
 begin
 
      if  not chk_cliente(p_id_cliente,p_check_id) then
+          raise ws_nocheck; 
+     end if;
+
+     if  not chk_registro(p_id_cliente,'BEGIN') then
           raise ws_nocheck;
      end if;
 
      begin
-          select count(*) into ws_check
-          from   CTB_REGISTRO
-          where  CTB_REGISTRO.id_cliente = p_id_cliente and
-               CTB_REGISTRO.tp_registro = 'BEGIN';
-          if  ws_check = 0 then
-               raise ws_nocheck;
-          end if;
-     exception
-          when others then
-               raise ws_nocheck;
-     end;
-
-     begin
           insert into CTB_ERROS (id_cliente, check_id, id_acao, nm_processo, dt_erro, ds_erro) values ( p_id_cliente, p_check_id, p_id_acao, 'PUT_ERROR', sysdate, p_erro_txt);
           commit;
-     exception
-          when others then
-               raise ws_nocheck;
+     exception when others then
+          raise ws_nocheck;
      end;
 
      begin
@@ -398,17 +377,17 @@ begin
           from ctb_acoes_exec 
           where id_cliente = p_id_cliente 
             and id_acao    = p_id_acao 
-            and status     = 'EXECUTANDO';
+            and status     = 'EXTRAINDO';
 
           update ctb_acoes_exec set status       = 'ERRO', 
                                    ds_erro       = substr(p_erro_txt,1,490), 
-                                   dt_final      = sysdate, 
+                                   dt_fim        = sysdate, 
                                    tempo_local   = 0,
                                    tempo_upload  = 0,
                                    tempo_processo= 0
           where id_cliente = p_id_cliente 
             and id_acao    = p_id_acao 
-            and status     = 'EXECUTANDO';
+            and status     = 'EXTRAINDO';
 
           if ws_run_acao_id is not null then 
                atu_status_acao ( ws_run_acao_id, 'ERRO' );  -- atualiza status da tarefa no BI 
@@ -416,45 +395,20 @@ begin
           
           commit;   
 
-     exception
-          when others then
-               raise ws_nocheck;
+     exception when others then
+          raise ws_nocheck;
      end;
 
      htp.p('OK');
 
 exception
      when others then
-          ws_query := SQLERRM;
-          insert into CTB_ERROS (id_cliente, check_id, id_acao, nm_processo, dt_erro, ds_erro) values ( p_id_cliente, p_check_id, p_id_acao, 'PUT_ERROR', sysdate, trim(ws_query));
+          ws_erro := trim(SQLERRM);
+          insert into CTB_ERROS (id_cliente, check_id, id_acao, nm_processo, dt_erro, ds_erro) values ( p_id_cliente, p_check_id, p_id_acao, 'PUT_ERROR', sysdate, ws_erro);
           commit;
           htp.p('OK');
 
 end put_error;
-
-
-function chk_cliente ( p_id_cliente     varchar2,
-	                   p_check_id       varchar2 ) return boolean as
-     ws_check            number;
-     ws_retorno          boolean;
-     ws_nocheck          exception;
-begin
-     ws_retorno := true;
-     begin
-          select count(*) into ws_check from CTB_CLIENTES
-          where id_cliente = p_id_cliente 
-            and check_id   = p_check_id;
-
-          if  ws_check <> 1 then
-               ws_retorno := false;
-               raise ws_nocheck;   -- Força erro 
-          end if;
-     exception when others then
-          ws_retorno := true;
-     end;
-     ws_retorno := true;
-     return(ws_retorno);
-end chk_cliente;
 
 
 
@@ -478,7 +432,7 @@ procedure upload ( p_documento      IN  varchar2 default null,
 begin
 
      ws_sysdate := sysdate; 
-     ws_status  := 'AGUARDANDO'; 
+     ws_status  := 'AGUARD.INSERCAO'; 
      ws_erro    := null; 
 
      select count(*), max(last_updated) into ws_count, ws_dt_aux  
@@ -582,7 +536,7 @@ procedure atu_status_acao ( prm_run_acao_id   number,
      ws_dh_f   date := null; 
 begin
 
-     if prm_status in ('EXECUTANDO','AGUARDANDO') then 
+     if prm_status in ('EXTRAINDO','AGUARDANDO') then 
           ws_dh_i :=  sysdate; 
      elsif prm_status in ('CONCLUIDO', 'ERRO','CANCELADO','ALERTA') then 
           ws_dh_f :=  sysdate; 
@@ -646,34 +600,6 @@ FUNCTION send_id RETURN VARCHAR2 AS
       RETURN(WS_IMEI||WS_SESSION||WS_INDICE||WS_INDICE_FAKE);
 
 END SEND_ID;
-
-
--- Função copiada da FUN 
-FUNCTION B2C(P_BLOB BLOB) RETURN CLOB IS
-      L_CLOB         CLOB;
-      L_DEST_OFFSSET INTEGER := 1;
-      L_SRC_OFFSSET  INTEGER := 1;
-      L_LANG_CONTEXT INTEGER := DBMS_LOB.DEFAULT_LANG_CTX;
-      L_WARNING      INTEGER;
-BEGIN
-      IF P_BLOB IS NULL THEN
-         RETURN NULL;
-      END IF;
-
-      DBMS_LOB.CREATETEMPORARY(LOB_LOC => L_CLOB
-                              ,CACHE   => FALSE);
-
-      DBMS_LOB.CONVERTTOCLOB(DEST_LOB     => L_CLOB
-                            ,SRC_BLOB     => P_BLOB
-                            ,AMOUNT       => DBMS_LOB.LOBMAXSIZE
-                            ,DEST_OFFSET  => L_DEST_OFFSSET
-                            ,SRC_OFFSET   => L_SRC_OFFSSET
-                            ,BLOB_CSID    => DBMS_LOB.DEFAULT_CSID
-                            ,LANG_CONTEXT => L_LANG_CONTEXT
-                            ,WARNING      => L_WARNING);
-
-      RETURN L_CLOB;
-END B2C;				 
 
 
 end agentc;
