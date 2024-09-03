@@ -211,9 +211,10 @@ procedure acao_end (      p_id_cliente      varchar2 default null,
      ws_tempo            varchar2(100);
      ws_check            number;
      ws_query            varchar2(4000);
-
-     ws_nocheck          exception;
      ws_fase             varchar2(3000);
+     ws_id_run_acao      ctb_acoes_exec.id_run_acao%type;
+     ws_nocheck          exception;
+
 
 begin
 
@@ -228,16 +229,24 @@ begin
      end if;
 
      begin
+          select max(id_run_acao) into ws_id_run_acao from ctb_acoes_exec 
+           where id_cliente   = p_id_cliente 
+             and id_acao      = p_id_acao 
+             and status       = 'EXTRAINDO';
+
           update ctb_acoes_exec 
-             set status         = 'CONCLUIDO', 
+             set status         = 'AGUARD.INSERCAO', 
                  dt_fim         = sysdate, 
                  tempo_local    = p_second,
                  tempo_upload   = p_second_upload,
                  tempo_processo = p_second_processo
-          where id_cliente = p_id_cliente 
-          and id_acao      = p_id_acao 
-          and status       = 'EXTRAINDO';
+          where id_cliente   = p_id_cliente 
+            and id_acao      = p_id_acao 
+            and status       = 'EXTRAINDO';
+
+          atu_status_acao ( ws_id_run_acao, 'AGUARD.INSERCAO');  -- atualiza status da tarefa no BI 
           COMMIT;
+
      exception when others then
           ws_fase := 'CTB_ACOES_EXEC:';
           raise ws_nocheck;
@@ -312,12 +321,12 @@ procedure request_acao (  p_id_cliente     varchar2 default null,
                           p_id_acao        varchar2 default null,
                           p_conteudo_envio varchar2 default 'N' ) as
      ws_query            clob;
-     ws_run_acao_id      number; 
+     ws_id_run_acao      number; 
      ws_nocheck          exception;
 begin
 
      begin
-         select comando, run_acao_id into ws_query, ws_run_acao_id
+         select comando, id_run_acao into ws_query, ws_id_run_acao
            from ctb_acoes_exec
           where id_cliente = p_id_cliente 
             and id_acao    = p_id_acao 
@@ -335,7 +344,7 @@ begin
        and id_acao    = p_id_acao 
        and status     = 'AGUARDANDO';
 
-     atu_status_acao ( ws_run_acao_id, 'EXTRAINDO');  -- atualiza status da tarefa no BI 
+     atu_status_acao ( ws_id_run_acao, 'EXTRAINDO');  -- atualiza status da tarefa no BI 
 
      COMMIT;
 
@@ -352,7 +361,7 @@ procedure put_error (p_id_cliente     varchar2 default null,
                      p_erro_txt       varchar2 default null ) as
      ws_check            number;
      ws_erro            varchar2(4000);
-     ws_run_acao_id      number;
+     ws_id_run_acao      number;
      ws_nocheck          exception;
 
 begin
@@ -373,8 +382,7 @@ begin
      end;
 
      begin
-          select run_acao_id into ws_run_acao_id
-          from ctb_acoes_exec 
+          select id_run_acao into ws_id_run_acao from ctb_acoes_exec 
           where id_cliente = p_id_cliente 
             and id_acao    = p_id_acao 
             and status     = 'EXTRAINDO';
@@ -389,8 +397,8 @@ begin
             and id_acao    = p_id_acao 
             and status     = 'EXTRAINDO';
 
-          if ws_run_acao_id is not null then 
-               atu_status_acao ( ws_run_acao_id, 'ERRO' );  -- atualiza status da tarefa no BI 
+          if ws_id_run_acao is not null then 
+               atu_status_acao ( ws_id_run_acao, 'ERRO' );  -- atualiza status da tarefa no BI 
           end if; 
           
           commit;   
@@ -414,7 +422,7 @@ end put_error;
 
 procedure upload ( p_documento      IN  varchar2 default null,
                    p_id_cliente     varchar2 default null,
-	               p_check_id       varchar2 default null,
+	              p_check_id       varchar2 default null,
                    p_id_acao        varchar2 default null
                    ) as
 
@@ -426,6 +434,7 @@ procedure upload ( p_documento      IN  varchar2 default null,
      ws_status           varchar2(20);
      ws_status_acao      varchar2(20);
      ws_id_agendamento   varchar2(40); 
+     ws_id_run_acao      varchar2(30);
      ws_erro             varchar2(100); 
      ws_dt_aux           date;   
 
@@ -446,7 +455,7 @@ begin
           ws_erro   := 'Arquivo enviado em duplicidade pelo Agente'; 
      end if; 
 
-     select nvl(max(status),'N/A'), nvl(max(id_agendamento),'0') into ws_status_acao, ws_id_agendamento 
+     select nvl(max(status),'N/A'), nvl(max(id_agendamento),'0'), max(id_run_acao) into ws_status_acao, ws_id_agendamento, ws_id_run_acao  
      from ctb_acoes_exec 
      where id_cliente = p_id_cliente
        and check_id   = p_check_id 
@@ -459,6 +468,7 @@ begin
      update ctb_docs set id_cliente     = p_id_cliente,
                          check_id       = p_check_id,
                          id_acao        = p_id_acao,
+                         id_run_acao    = ws_id_run_acao, 
                          id_agendamento = ws_id_agendamento,
                          last_updated   = ws_sysdate,
                          status         = ws_status,
@@ -530,23 +540,23 @@ end error_domweb;
 
 
 
-procedure atu_status_acao ( prm_run_acao_id   number, 
+procedure atu_status_acao ( prm_id_run_acao   number, 
                             prm_status        varchar2 ) as 
-     ws_dh_i   date := null;
-     ws_dh_f   date := null; 
+     ws_dt_i   date := null;
+     ws_dt_f   date := null; 
 begin
 
      if prm_status in ('EXTRAINDO','AGUARDANDO') then 
-          ws_dh_i :=  sysdate; 
+          ws_dt_i :=  sysdate; 
      elsif prm_status in ('CONCLUIDO', 'ERRO','CANCELADO','ALERTA') then 
-          ws_dh_f :=  sysdate; 
+          ws_dt_f :=  sysdate; 
      end if; 
 
      update ctb_run_acoes
-	   set last_status = prm_status, 
-            dh_inicio   = nvl(nvl(ws_dh_i, dh_inicio),ws_dh_f),
-            dh_fim      = nvl(ws_dh_f, dh_fim)
-	 where run_acao_id = prm_run_acao_id;
+	   set status      = prm_status, 
+            dt_inicio   = nvl(nvl(ws_dt_i, dt_inicio),ws_dt_f),
+            dt_fim      = nvl(ws_dt_f, dt_fim)
+	 where id_run_acao = prm_id_run_acao;
 
 exception when others then   
   	insert into bi_log_sistema values(sysdate, 'agentc.atu_status_acao :'||substr(DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,1,3900), 'AGENTC', 'ERRO');

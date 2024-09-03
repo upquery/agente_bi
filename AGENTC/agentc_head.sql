@@ -49,7 +49,7 @@ create or replace package     agentc is
                                  p_nm_arquivo      varchar2 DEFAULT NULL,
                                  p_erro_txt        varchar2 DEFAULT null
                        );
-    procedure atu_status_acao ( prm_run_acao_id   number, 
+    procedure atu_status_acao ( prm_id_run_acao   number, 
                                 prm_status        varchar2 ) ; 
     
     function send_id return varchar2;
