@@ -118,8 +118,7 @@ procedure ctb_acoes_exec_list(prm_tp      varchar2,
 procedure ctb_acoes_exec_comando (prm_id_agendamento  varchar2, 
                          	      prm_coluna 	      varchar2);  
 
-procedure ctb_docs_list (prm_id_cliente   varchar2,
-                         prm_id_acao      varchar2,
+procedure ctb_docs_list (prm_id_run_acao  varchar2,
 					     prm_linhas	      varchar2 default '50') ; 
 
 procedure ctb_run_list (prm_order       varchar2 default '2', 
