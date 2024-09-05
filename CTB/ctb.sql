@@ -257,7 +257,8 @@ begin
 
 		when prm_campo = 'lista-ctb-clientes' then
 			for i in ( select 1 ordem, id_cliente, nm_cliente from ctb_clientes 
-			            where id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = ws_usuario and nvl(habilitado,'N/A') = 'S')
+			            where id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = ws_usuario)
+						  and habilitado = 'S'
 			           order by 1,2) loop
   				nested_test_list(prm_ref, i.id_cliente, i.nm_cliente);
 			end loop;
@@ -772,7 +773,7 @@ procedure ctb_usua_clie_lista (prm_usuario   varchar2 default null,
 begin 
     ws_clientes := ctb.ctb_clie_usua_get(prm_usuario);    
 	select listagg(id_cliente||'-'||nm_cliente,',') within group (order by nm_cliente) into ws_nm_clientes from ctb_clientes 
-	 where nvl(habilitado,'N/A') = 'S'
+	 where habilitado = 'S'
 	   and id_cliente in (select column_value from table(fun.vpipe(ws_clientes)));
 	htp.p('<div class="searchbar">');
 		if prm_editavel = 'S' then 
