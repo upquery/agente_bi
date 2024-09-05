@@ -207,6 +207,9 @@ procedure ctb_fakelistoptions ( prm_ident     varchar2 default null,
 								prm_obj		  varchar2 default null ) as
 
 	ws_usuario  varchar2(100); 
+	ws_id_cliente     varchar2(100); 
+	ws_id_sistema     varchar2(100); 
+	ws_id_tipo_banco  varchar2(100); 
 
 	procedure nested_test_list ( prm_ref     varchar2 default null,
 								prm_id      varchar2 default null,
@@ -242,8 +245,8 @@ begin
 
 	case
 		when prm_campo = 'lista-ctb-tipo-banco' then
-			for i in ( select cd_tipo_banco, ds_tipo_banco from ctb_tipo_banco order by 1) loop
-				nested_test_list(prm_ref, i.cd_tipo_banco, i.ds_tipo_banco);
+			for i in ( select id_tipo_banco, ds_tipo_banco from ctb_tipo_banco order by 1) loop
+				nested_test_list(prm_ref, i.id_tipo_banco, i.ds_tipo_banco);
 			end loop;
 
 		when prm_campo = 'lista-ctb-tipo-comando' then
@@ -251,8 +254,8 @@ begin
 				nested_test_list(prm_ref, i.cod, i.nome);
 			end loop;
 		when prm_campo = 'lista-ctb-sistemas' then
-			for i in ( select 1 ordem, cd_sistema, ds_sistema from ctb_sistemas order by 1,2) loop
-  				nested_test_list(prm_ref, i.cd_sistema, i.cd_sistema);
+			for i in ( select 1 ordem, id_sistema, ds_sistema from ctb_sistemas order by 1,2) loop
+  				nested_test_list(prm_ref, i.id_sistema, i.id_sistema);
 			end loop;
 
 		when prm_campo = 'lista-ctb-clientes' then
@@ -264,8 +267,13 @@ begin
 			end loop;
 
 		when prm_campo = 'lista-ctb-conexoes' then
+			ws_id_cliente    := fun.vpipe_n(prm_adicional,1);
+			ws_id_sistema    := fun.vpipe_n(prm_adicional,2);
+			ws_id_tipo_banco := fun.vpipe_n(prm_adicional,3); 
 			for i in ( select distinct id_conexao from ctb_conexoes 
-			            where id_cliente = nvl(prm_adicional,id_cliente) 
+			            where id_cliente    = nvl(ws_id_cliente,id_cliente) 
+						  and id_conexao in (select id_conexao from ctb_conexoes where cd_parametro = 'DB'      and conteudo = ws_id_tipo_banco)  
+						  and id_conexao in (select id_conexao from ctb_conexoes where cd_parametro = 'SISTEMA' and conteudo = ws_id_sistema)  
 						  and id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = ws_usuario and id_selecionado = 'S') 
 					   order by 1)
 			loop
@@ -860,16 +868,16 @@ begin
 		end if; 
 		htp.p('<input type="hidden" id="prm_id_copia"   value="'||prm_id_copia||'">');	
 
-		fcl.fakeoption('prm_cd_sistema',    fun.lang('Sistema'),    ws_acoes.cd_sistema,    'lista-ctb-sistemas',    'N', 'N', null, prm_min => 1);
-		fcl.fakeoption('prm_cd_tipo_banco', fun.lang('Tipo Banco'), ws_acoes.cd_tipo_banco, 'lista-ctb-tipo-banco', 'N', 'N', null, prm_min => 1);
+		fcl.fakeoption('prm_id_sistema',    fun.lang('Sistema'),    ws_acoes.id_sistema,    'lista-ctb-sistemas',    'N', 'N', null, prm_min => 1);
+		fcl.fakeoption('prm_id_tipo_banco', fun.lang('Tipo Banco'), ws_acoes.id_tipo_banco, 'lista-ctb-tipo-banco', 'N', 'N', null, prm_min => 1);
 		
-		htp.p('<span class="script" onclick="let vid = document.getElementById(''prm_cd_sistema'').title.substring(0,4); if (document.getElementById(''prm_tipo_comando'').title==''FULL''){vid = vid +''_TAUX_'';}else{vid = vid + ''_V_'';}; document.getElementById(''prm_id_acao'').value=vid;"></span>');
+		htp.p('<span class="script" onclick="let vid = document.getElementById(''prm_id_sistema'').title.substring(0,4); if (document.getElementById(''prm_tipo_comando'').title==''FULL''){vid = vid +''_TAUX_'';}else{vid = vid + ''_V_'';}; document.getElementById(''prm_id_acao'').value=vid;"></span>');
 		fcl.fakeoption('prm_tipo_comando', fun.lang('TIPO COMANDO'), ws_acoes.tipo_comando, 'lista-ctb-tipo-comando', 'N', 'N', null);				
 
 		htp.p('<input type="text"   id="prm_id_acao"   data-min="1" data-encode="N" placeholder="'||fun.lang('ID A&Ccedil;&Atilde;O')||'" class="up" '||ws_onkeypress_pipe||' value="'||ws_acoes.id_acao||'" />');
 
 		htp.p('<a class="addpurple followed" title="'||fun.lang('Adicionar A&ccedil;&atilde;o')||'" data-sup="ctb_acoes"'||  
-				'data-req="ctb_acoes_insert" data-par="prm_id_cliente|prm_id_acao|prm_cd_sistema|prm_cd_tipo_banco|prm_tipo_comando|prm_id_copia" '||
+				'data-req="ctb_acoes_insert" data-par="prm_id_cliente|prm_id_acao|prm_id_sistema|prm_id_tipo_banco|prm_tipo_comando|prm_id_copia" '||
 				'data-res="ctb_acoes_list" data-msg="'||fun.lang('Adicionado com sucesso')||'" data-pkg="ctb">'||fun.lang('ADICIONAR')||'</a>');
 
 	when prm_menu = 'ctb_run' then 	
@@ -1311,8 +1319,9 @@ begin
             end if; 
 
 			select count(*) into ws_count from ctb_conexoes 
-			 where id_cliente = ws_id_cliente 
-			   and id_conexao = ws_id_conexao; 
+			 where id_cliente   = ws_id_cliente 
+			   and id_conexao   = ws_id_conexao
+			   and cd_parametro = a.cd_parametro; 
 			if ws_count > 0 then 
 				ws_erro := 'J&aacute; existe uma conex&atilde;o cadastrada com esse ID para esse cliente';
 				raise raise_erro;
@@ -1418,10 +1427,10 @@ procedure ctb_acoes_list (prm_id_acao      varchar2 default null,
 	ws_usuario         varchar2(100);
 
 	cursor c1 is 
-		select ac.id_cliente, ac.id_acao, ac.cd_sistema, si.ds_sistema, ac.cd_tipo_banco, tb.ds_tipo_banco,  tipo_comando, comando, comando_limpar
+		select ac.id_cliente, ac.id_acao, ac.id_sistema, si.ds_sistema, ac.id_tipo_banco, tb.ds_tipo_banco,  tipo_comando, comando, comando_limpar
           from ctb_sistemas si, ctb_tipo_banco tb, ctb_acoes ac 
-		 where si.cd_sistema    = ac.cd_sistema
-		   and tb.cd_tipo_banco = ac.cd_tipo_banco 
+		 where si.id_sistema    = ac.id_sistema
+		   and tb.id_tipo_banco = ac.id_tipo_banco 
            and ac.id_acao       = nvl(prm_id_acao, id_acao)
 		   and ac.id_cliente in (select id_cliente from ctb_usuario_cliente where cd_usuario = gbl.getusuario() and id_selecionado = 'S' ) 
 		  order by case when prm_dir = '1' then decode(prm_order, '1', ac.id_acao, '2', si.ds_sistema, '3', tb.ds_tipo_banco, '4', ac.tipo_comando, id_acao) end asc,
@@ -1486,13 +1495,13 @@ begin
 					ws_comando_l := replace(fun.html_trans(substr(a.comando_limpar,1,500)),chr(10),'<br>');
 
 					htp.p('<td class="fake-list">');
-						htp.p('<a class="script" data-default="'||a.cd_sistema||'" onclick='||replace(replace(ws_evento,'#CAMPO#','CD_SISTEMA'),'#VALOR#','this.nextElementSibling.title')||'></a>');
-						fcl.fakeoption('prm_cd_sistema_'||a.id_acao, fun.lang('Sistema'), a.cd_sistema, 'lista-ctb-sistemas', 'N', 'N', null, prm_min => 1, prm_desc => fun.lang(a.ds_sistema) );
+						htp.p('<a class="script" data-default="'||a.id_sistema||'" onclick='||replace(replace(ws_evento,'#CAMPO#','ID_SISTEMA'),'#VALOR#','this.nextElementSibling.title')||'></a>');
+						fcl.fakeoption('prm_id_sistema_'||a.id_acao, fun.lang('Sistema'), a.id_sistema, 'lista-ctb-sistemas', 'N', 'N', null, prm_min => 1, prm_desc => fun.lang(a.ds_sistema) );
 					htp.p('</td>');
 
 					htp.p('<td>');
-						htp.p('<a class="script" data-default="'||a.cd_tipo_banco||'" onclick='||replace(replace(ws_evento,'#CAMPO#','CD_TIPO_BANCO'),'#VALOR#','this.nextElementSibling.title')||'></a>');
-						fcl.fakeoption('prm_cd_tipo_banco_'||a.id_acao, fun.lang('Tipo Banco'), a.cd_tipo_banco, 'lista-ctb-tipo-banco', 'N', 'N', null, prm_min => 1, prm_desc => fun.lang(a.ds_tipo_banco) );
+						htp.p('<a class="script" data-default="'||a.id_tipo_banco||'" onclick='||replace(replace(ws_evento,'#CAMPO#','id_tipo_banco'),'#VALOR#','this.nextElementSibling.title')||'></a>');
+						fcl.fakeoption('prm_id_tipo_banco_'||a.id_acao, fun.lang('Tipo Banco'), a.id_tipo_banco, 'lista-ctb-tipo-banco', 'N', 'N', null, prm_min => 1, prm_desc => fun.lang(a.ds_tipo_banco) );
 					htp.p('</td>');
 
 					htp.p('<td>');
@@ -1517,7 +1526,7 @@ begin
 					end if; 
 
 					htp.p('<td>');
-						fcl.button_lixo('ctb_acoes_delete','prm_id_acao', a.id_acao, prm_tag => 'a', prm_pkg => 'CTB');
+						fcl.button_lixo('ctb_acoes_delete','prm_id_cliente|prm_id_acao', a.id_cliente||'|'||a.id_acao, prm_tag => 'a', prm_pkg => 'CTB');
 					htp.p('</td>');
 				htp.p('</tr>');						
 			end loop; 	
@@ -1537,8 +1546,8 @@ end ctb_acoes_list;
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure ctb_acoes_insert (prm_id_cliente       varchar2, 
 							prm_id_acao          varchar2, 
-							prm_cd_sistema       varchar2,
-							prm_cd_tipo_banco    varchar2,
+							prm_id_sistema       varchar2,
+							prm_id_tipo_banco    varchar2,
 						    prm_tipo_comando     varchar2,
 						    prm_id_copia         varchar2 default null) as 
 
@@ -1546,8 +1555,8 @@ procedure ctb_acoes_insert (prm_id_cliente       varchar2,
 	ws_count 		     integer; 
 	ws_erro     		 varchar2(300); 
 
-	ws_cd_sistema      ctb_acoes.cd_sistema%type;
-	ws_cd_tipo_banco   ctb_acoes.cd_tipo_banco%type;
+	ws_id_sistema      ctb_acoes.id_sistema%type;
+	ws_id_tipo_banco   ctb_acoes.id_tipo_banco%type;
 	ws_tipo_comando    ctb_acoes.tipo_comando%type;
 	ws_comando         ctb_acoes.comando%type;
 	ws_comando_limpar  ctb_acoes.comando_limpar%type;
@@ -1572,8 +1581,8 @@ begin
 
 	if prm_id_copia is not null then
 		begin 
-			select cd_sistema, cd_tipo_banco, tipo_comando, comando, comando_limpar
-			  into ws_cd_sistema, ws_cd_tipo_banco, ws_tipo_comando, ws_comando, ws_comando_limpar
+			select id_sistema, id_tipo_banco, tipo_comando, comando, comando_limpar
+			  into ws_id_sistema, ws_id_tipo_banco, ws_tipo_comando, ws_comando, ws_comando_limpar
 			from ctb_acoes 
 			where id_cliente = prm_id_cliente 
 			  and id_acao    = prm_id_copia
@@ -1582,15 +1591,15 @@ begin
 			null;
 		end; 	
 	else 
-		ws_cd_sistema      := prm_cd_sistema;
-		ws_cd_tipo_banco   := prm_cd_tipo_banco;  
+		ws_id_sistema      := prm_id_sistema;
+		ws_id_tipo_banco   := prm_id_tipo_banco;  
 		ws_tipo_comando    := prm_tipo_comando; 
 		ws_comando         := null;
 		ws_comando_limpar  := null;
 	end if; 
 
-	insert into ctb_acoes (id_cliente,     id_acao,                  cd_sistema,    cd_tipo_banco,    tipo_comando,    comando,    comando_limpar)
-    	           values (prm_id_cliente, trim(upper(prm_id_acao)), ws_cd_sistema, ws_cd_tipo_banco, ws_tipo_comando, ws_comando, ws_comando_limpar);
+	insert into ctb_acoes (id_cliente,     id_acao,                  id_sistema,    id_tipo_banco,    tipo_comando,    comando,    comando_limpar)
+    	           values (prm_id_cliente, trim(upper(prm_id_acao)), ws_id_sistema, ws_id_tipo_banco, ws_tipo_comando, ws_comando, ws_comando_limpar);
 
 	commit; 			  
 	htp.p('OK|Registro inserido');
@@ -1630,8 +1639,8 @@ begin
 	end if; 
 
 	update ctb_acoes  
-	   set cd_sistema     = decode(ws_parametro, 'CD_SISTEMA',       ws_conteudo, cd_sistema   ), 
-		   cd_tipo_banco  = decode(ws_parametro, 'CD_TIPO_BANCO',    ws_conteudo, cd_tipo_banco), 
+	   set id_sistema     = decode(ws_parametro, 'ID_SISTEMA',       ws_conteudo, id_sistema   ), 
+		   id_tipo_banco  = decode(ws_parametro, 'ID_TIPO_BANCO',    ws_conteudo, id_tipo_banco), 
 		   tipo_comando   = decode(ws_parametro, 'TIPO_COMANDO',     ws_conteudo, tipo_comando), 
 		   comando        = decode(ws_parametro, 'COMANDO',          ws_conteudo, comando      ), 
 		   comando_limpar = decode(ws_parametro, 'COMANDO_LIMPAR',   ws_conteudo, comando_limpar)
@@ -2495,9 +2504,10 @@ end ctb_run_schedule_delete;
 procedure ctb_run_acoes_list(prm_ID_RUN     varchar2) as 
 
 	cursor c_acoes is 
-	select ru.id_cliente, rc.ID_RUN, rc.id_run_acao, rc.ordem, rc.id_acao, ac.cd_sistema, ac.cd_tipo_banco, rc.id_conexao, rc.tbl_destino, dt_inicio, dt_fim, rc.status 
+	select ru.id_cliente, rc.ID_RUN, rc.id_run_acao, rc.ordem, rc.id_acao, ac.id_sistema, ac.id_tipo_banco, rc.id_conexao, rc.tbl_destino, dt_inicio, dt_fim, rc.status 
 	  from ctb_acoes ac, ctb_run_acoes rc, ctb_run ru 
-	 where ac.id_acao    = rc.id_acao 
+	 where ac.id_acao(+)    = rc.id_acao 
+	   and ac.id_cliente(+) = rc.id_cliente
 	   and rc.ID_RUN     = ru.ID_RUN
 	   and ru.ID_RUN     = prm_ID_RUN order by ordem; 
 	-- 						 	
@@ -2542,26 +2552,27 @@ begin
 
 			for a in c_acoes loop
 
-				ws_evento := replace(ws_eventoGravar,'#ID#',a.id_run_acao); 
+				ws_evento  := replace(ws_eventoGravar,'#ID#',a.id_run_acao); 
 
 				htp.p('<tr id="'||a.id_run_acao||'">');
 
 					htp.p('<td style="width: 60px !important;"><input id="prm_ordem_'||a.id_run_acao||'" style="min-width: 60px !important; width: 60px !important;" data-min="1" data-default="'||a.ordem||'" '||ws_onkeypress_int||' onblur='||replace(replace(ws_evento,'#CAMPO#','ORDEM'),'#VALOR#','this.value')||' value="'||a.ordem||'" /></td>');
 
 					htp.p('<td class="fake-list" style="border-right: none; max-width: 170px !important;">');
-						htp.p('<a class="script" data-default="'||a.id_acao||'" onclick='||replace(replace(ws_evento,'#CAMPO#','ID_ACAO'),'#VALOR#','this.nextElementSibling.title')||'></a>');
+						htp.p('<a class="script" data-default="'||a.id_acao||'" '||
+								' onclick="call(''ctb_run_acoes_update'', ''prm_id_run_acao='||a.id_run_acao||'&prm_cd_parametro=ID_ACAO&prm_conteudo=''+this.nextElementSibling.title, ''CTB'').then(function(resposta){ alerta('''',resposta.split(''|'')[1]); if (resposta.split(''|'')[0] == ''OK'') {ajax(''list'', ''ctb_run_acoes_list'', ''prm_ID_RUN='||prm_ID_RUN||''', true, ''content'','''','''',''CTB''); } });"></a>');
 						fcl.fakeoption('prm_step_id_'||a.id_run_acao, '', a.id_acao, 'lista-ctb-acoes', prm_editable=>'S', prm_multi=>'N', prm_desc => a.id_acao, prm_min => 1, prm_class_adic => ' fakelist-border-right' );
 					htp.p('</td>');
 					htp.p('<td class="ctb_atalho" title="Abre a tela de cadastro de A&ccedil;&otilde;es" style="width: 30px;"'||
 							  ' onclick="carregaTelasup(''ctb_acoes_list'', ''prm_id_acao='||a.id_acao||''', ''CTB'', '''','''','''',''ctb_run_acoes_list|prm_ID_RUN='||prm_ID_RUN||'|CTB|ctb_run_acoes|||'');">');
 						htp.p('<svg style="height: 32px; width: 32px; float: left;" viewBox="0 0 24 24" clip-rule="evenodd" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2" xmlns="http://www.w3.org/2000/svg"><path d="m21 4c0-.478-.379-1-1-1h-16c-.62 0-1 .519-1 1v16c0 .621.52 1 1 1h16c.478 0 1-.379 1-1zm-16.5.5h15v15h-15zm12.5 10.75c0-.414-.336-.75-.75-.75h-8.5c-.414 0-.75.336-.75.75s.336.75.75.75h8.5c.414 0 .75-.336.75-.75zm0-3.248c0-.414-.336-.75-.75-.75h-8.5c-.414 0-.75.336-.75.75s.336.75.75.75h8.5c.414 0 .75-.336.75-.75zm0-3.252c0-.414-.336-.75-.75-.75h-8.5c-.414 0-.75.336-.75.75s.336.75.75.75h8.5c.414 0 .75-.336.75-.75z" fill-rule="nonzero"/></svg>');
 					htp.p('</td>');
-					htp.p('<td><div>'||a.cd_sistema||'</div></td>');
-					htp.p('<td><div>'||a.cd_tipo_banco||'</div></td>');
+					htp.p('<td><div>'||a.id_sistema||'</div></td>');
+					htp.p('<td><div>'||a.id_tipo_banco||'</div></td>');
 
 					htp.p('<td class="fake-list" style="border-right: none; max-width: 170px !important;">');
 						htp.p('<a class="script" data-default="'||a.id_conexao||'" onclick='||replace(replace(ws_evento,'#CAMPO#','ID_CONEXAO'),'#VALOR#','this.nextElementSibling.title')||'></a>');
-						fcl.fakeoption('prm_id_conexao_'||a.id_run_acao, '', a.id_conexao, 'lista-ctb-conexoes', prm_editable=>'S', prm_multi=>'N', prm_desc => a.id_conexao, prm_min => 1 );
+						fcl.fakeoption('prm_id_conexao_'||a.id_run_acao, '', a.id_conexao, 'lista-ctb-conexoes', prm_editable=>'S', prm_multi=>'N', prm_desc => a.id_conexao, prm_min => 1, prm_adicional => a.id_cliente||'|'||a.id_sistema||'|'||a.id_tipo_banco );
 					htp.p('</td>');
 
 					htp.p('<td>');
@@ -2649,7 +2660,14 @@ procedure ctb_run_acoes_update ( prm_id_run_acao   varchar2,
 						   	     prm_conteudo      varchar2 ) as 
 	ws_parametro varchar2(4000);
 	ws_conteudo  varchar2(32000); 
-	ws_ID_RUN    varchar2(30); 
+	ws_id_run             varchar2(30); 
+	ws_id_cliente 	 	  varchar2(50);
+	ws_id_conexao   	  varchar2(50);
+	ws_id_sistema_acao    varchar2(50) := null;
+	ws_id_sistema_con     varchar2(50) := null;
+	ws_id_tipo_banco_acao varchar2(50) := null;
+	ws_id_tipo_banco_con  varchar2(50) := null;
+
 	ws_erro      varchar2(300); 
 	ws_count     integer; 
 	raise_erro   exception;
@@ -2661,6 +2679,11 @@ begin
 		ws_erro := 'Campo deve ser preenchido';
 		raise raise_erro; 
 	end if; 	
+
+	select id_cliente, id_run, id_conexao 
+	  into ws_id_cliente, ws_id_run, ws_id_conexao 
+	  from ctb_run_acoes 
+	 where id_run_acao = prm_id_run_acao; 
 
 	-- Não permite alterar a ordem se já estiver outra ação com essa ordem 
 	if prm_cd_parametro = 'ORDEM' then 
@@ -2682,6 +2705,33 @@ begin
 		ws_erro := 'N&atilde;o localizado tarefa para atualiza&ccedil;&atilde;o, recarrega a tela e tente novamente'; 
 		raise raise_erro; 
 	end if;
+
+	if ws_parametro = 'ID_ACAO' then 
+		select min(id_sistema), min(id_tipo_banco) into ws_id_sistema_acao, ws_id_tipo_banco_acao from ctb_acoes where id_cliente = ws_id_cliente and id_acao = ws_conteudo;		
+		if ws_id_conexao is not null then  
+			-- limpa a conexão se a conexão existente não for do mesmo sistema e tipo de banco 
+			select min(conteudo) into ws_id_sistema_con    from ctb_conexoes where id_cliente = ws_id_cliente and id_conexao = ws_id_conexao and cd_parametro = 'SISTEMA';
+			select min(conteudo) into ws_id_tipo_banco_con from ctb_conexoes where id_cliente = ws_id_cliente and id_conexao = ws_id_conexao and cd_parametro = 'DB';
+			if nvl(ws_id_sistema_acao,'.') <> nvl(ws_id_sistema_con,'.') or nvl(ws_id_tipo_banco_acao,'.') <> nvl(ws_id_tipo_banco_con,'.') then 
+				ws_id_conexao := null;
+			end if;
+		else 
+insert into err_txt values ('a1:'||ws_id_sistema_acao||'-'||ws_id_sistema_acao);
+commit; 
+			-- se a conexao estiver em branco procura uma que seja do mesmo sistema e tipo de banco da açao 
+			select min(id_conexao ) into ws_id_conexao
+			 from ctb_conexoes
+             where (id_cliente, id_conexao) in (select b.id_cliente, b.id_conexao from ctb_conexoes b where id_cliente = ws_id_cliente and cd_parametro = 'SISTEMA' and conteudo = ws_id_sistema_acao)
+               and (id_cliente, id_conexao) in (select b.id_cliente, b.id_conexao from ctb_conexoes b where id_cliente = ws_id_cliente and cd_parametro = 'DB'      and conteudo = ws_id_tipo_banco_acao);
+insert into err_txt values ('a2:'||ws_id_conexao );
+commit; 
+
+		end if;
+
+		update ctb_run_acoes set id_conexao = ws_id_conexao
+		where id_run_acao = prm_id_run_acao;			
+
+	end if; 
 
 	commit; 
 	htp.p('OK|Registro alterado');

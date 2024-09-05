@@ -94,8 +94,8 @@ procedure ctb_acoes_list (prm_id_acao      varchar2 default null,
 
 procedure ctb_acoes_insert (prm_id_cliente       varchar2, 
 							prm_id_acao          varchar2,
-							prm_cd_sistema       varchar2,
-							prm_cd_tipo_banco    varchar2,
+							prm_id_sistema       varchar2,
+							prm_id_tipo_banco    varchar2,
 						    prm_tipo_comando     varchar2,
 						    prm_id_copia         varchar2 default null); 
 
