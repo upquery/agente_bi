@@ -758,8 +758,6 @@ end ctb_clie_usua_get;
 procedure ctb_usua_clie_sel (prm_usuario varchar2 default null, prm_clientes varchar2) as 
     ws_usuario varchar2(100);
 begin 
-insert into err_txt values ('a1:'||prm_usuario||'-'||prm_clientes);
-commit; 
     ws_usuario := nvl(prm_usuario, gbl.getusuario()); 
     update ctb_usuario_cliente set id_selecionado = 'N'  
      where cd_usuario = ws_usuario ;
@@ -2716,16 +2714,11 @@ begin
 				ws_id_conexao := null;
 			end if;
 		else 
-insert into err_txt values ('a1:'||ws_id_sistema_acao||'-'||ws_id_sistema_acao);
-commit; 
 			-- se a conexao estiver em branco procura uma que seja do mesmo sistema e tipo de banco da açao 
 			select min(id_conexao ) into ws_id_conexao
 			 from ctb_conexoes
              where (id_cliente, id_conexao) in (select b.id_cliente, b.id_conexao from ctb_conexoes b where id_cliente = ws_id_cliente and cd_parametro = 'SISTEMA' and conteudo = ws_id_sistema_acao)
                and (id_cliente, id_conexao) in (select b.id_cliente, b.id_conexao from ctb_conexoes b where id_cliente = ws_id_cliente and cd_parametro = 'DB'      and conteudo = ws_id_tipo_banco_acao);
-insert into err_txt values ('a2:'||ws_id_conexao );
-commit; 
-
 		end if;
 
 		update ctb_run_acoes set id_conexao = ws_id_conexao
