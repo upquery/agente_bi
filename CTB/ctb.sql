@@ -869,7 +869,7 @@ begin
 		fcl.fakeoption('prm_id_sistema',    fun.lang('Sistema'),    ws_acoes.id_sistema,    'lista-ctb-sistemas',    'N', 'N', null, prm_min => 1);
 		fcl.fakeoption('prm_id_tipo_banco', fun.lang('Tipo Banco'), ws_acoes.id_tipo_banco, 'lista-ctb-tipo-banco', 'N', 'N', null, prm_min => 1);
 		
-		htp.p('<span class="script" onclick="let vid = document.getElementById(''prm_id_sistema'').title.substring(0,4); if (document.getElementById(''prm_tipo_comando'').title==''FULL''){vid = vid +''_TAUX_'';}else{vid = vid + ''_V_'';}; document.getElementById(''prm_id_acao'').value=vid;"></span>');
+		htp.p('<span class="script" onclick="let vid = ''''; if (document.getElementById(''prm_tipo_comando'').title==''FULL''){vid = ''ETL_TAUX_'';}else{vid = ''ETL_V_'';}; document.getElementById(''prm_id_acao'').value=vid;"></span>');
 		fcl.fakeoption('prm_tipo_comando', fun.lang('TIPO COMANDO'), ws_acoes.tipo_comando, 'lista-ctb-tipo-comando', 'N', 'N', null);				
 
 		htp.p('<input type="text"   id="prm_id_acao"   data-min="1" data-encode="N" placeholder="'||fun.lang('ID A&Ccedil;&Atilde;O')||'" class="up" '||ws_onkeypress_pipe||' value="'||ws_acoes.id_acao||'" />');

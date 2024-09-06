@@ -59,6 +59,9 @@ procedure request_begin (  p_id_cliente     varchar2 default null,
 
 begin
 
+insert into dwu.err_txt values ('a0');
+commit; 
+
      -- Verifica se tem versão mais recente do AGENTE, e retorna o link de download da nova versão 
      if  substr(p_versao,1,1) <> '0' then
           begin
@@ -440,6 +443,8 @@ procedure upload ( p_documento      IN  varchar2 default null,
 
 begin
 
+insert into dwu.err_txt values ('a1');
+commit; 
      ws_sysdate := sysdate; 
      ws_status  := 'AGUARD.INSERCAO'; 
      ws_erro    := null; 
