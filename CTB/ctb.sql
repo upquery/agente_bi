@@ -1097,11 +1097,16 @@ end ctb_destino_insert;
 procedure ctb_destino_update ( prm_id_cliente    varchar2, 
                                prm_cd_parametro  varchar2,
 							   prm_conteudo      varchar2 ) as 
-	raise_erro  exception; 							   
 	ws_erro     varchar2(300); 
+	ws_vl_old   varchar2(4000);
+	raise_erro  exception; 							   
 begin 
 
 	ctb_conexoes_valida ('U',prm_cd_parametro, prm_conteudo, ws_erro); if ws_erro is not null then raise raise_erro; end if; 
+
+	select substr(max(conteudo),1,3990) into ws_vl_old from ctb_destino 
+	 where id_cliente   = prm_id_cliente
+	   and cd_parametro = prm_cd_parametro;
 
 	update ctb_destino 
 	   set conteudo = prm_conteudo 
@@ -1110,6 +1115,9 @@ begin
 	if sql%notfound then    
 		insert into ctb_destino (id_cliente, cd_parametro, conteudo) values (prm_id_cliente, prm_cd_parametro, prm_conteudo); 
 	end if;        
+	
+	fun.bi_log_alt_insere('U','CTB_DESTINO', prm_id_cliente||'|'||prm_cd_parametro, 'CONTEUDO', sysdate, gbl.getusuario(), ws_vl_old, substr(prm_conteudo,1,3990)); 
+	
 	commit; 
 	htp.p('OK|Registro atualizado');
 exception 
@@ -1138,6 +1146,7 @@ begin
 	end if; 
 
 	delete ctb_destino where id_cliente = prm_id_cliente;  
+	fun.bi_log_alt_insere('D','CTB_DESTINO', prm_id_cliente, null, sysdate, gbl.getusuario(), null, null); 
 	commit;
 
 	htp.p('OK|Registro exclu&iacute;do');
@@ -1360,11 +1369,17 @@ procedure ctb_conexoes_update ( prm_id_cliente    varchar2,
                                 prm_id_conexao    varchar2, 
                                 prm_cd_parametro  varchar2,
 							    prm_conteudo      varchar2 ) as 
-	raise_erro  exception; 							   
 	ws_erro     varchar2(300); 
+	ws_vl_old   varchar2(4000);
+	raise_erro  exception; 							   
 begin 
 
 	ctb_conexoes_valida ('U',prm_cd_parametro, prm_conteudo, ws_erro); if ws_erro is not null then raise raise_erro; end if; 
+
+	select substr(max(conteudo),1,3990) into ws_vl_old from ctb_conexoes 
+	 where id_cliente   = prm_id_cliente
+       and id_conexao   = prm_id_conexao 
+	   and cd_parametro = prm_cd_parametro;
 
 	update ctb_conexoes 
 	   set conteudo = prm_conteudo 
@@ -1373,7 +1388,8 @@ begin
 	   and cd_parametro = prm_cd_parametro;
 	if sql%notfound then    
 		insert into ctb_conexoes (id_cliente, id_conexao, cd_parametro, conteudo) values (prm_id_cliente, prm_id_conexao, prm_cd_parametro, prm_conteudo); 
-	end if;        
+	end if; 
+	fun.bi_log_alt_insere('U','CTB_CONEXOES', prm_id_cliente||'|'||prm_id_conexao||'|'||prm_cd_parametro, 'CONTEUDO', sysdate, gbl.getusuario(), ws_vl_old, substr(prm_conteudo,1,3990)); 	       
 	commit; 
 	htp.p('OK|Registro atualizado');
 exception 
@@ -1404,6 +1420,7 @@ begin
 	end if; 
 
 	delete ctb_conexoes where id_cliente = prm_id_cliente and id_conexao = prm_id_conexao;  
+	fun.bi_log_alt_insere('D','CTB_CONEXOES', prm_id_cliente||'|'||prm_id_conexao, null, sysdate, gbl.getusuario(), null, null); 	       	
 	commit;  
 
 	htp.p('OK|Registro exclu&iacute;do');
@@ -2196,7 +2213,7 @@ begin
 		raise raise_erro; 
 	end if; 	
 
-	execute immediate 'select substr('||ws_parametro||',1,3990) from ctb_run where id_run = :id_run' into ws_vl_old using in prm_id_run;
+	execute immediate 'select substr(max('||ws_parametro||'),1,3990) from ctb_run where id_run = :id_run' into ws_vl_old using in prm_id_run;
 
 	update ctb_run  
 	   set ds_run   = decode(ws_parametro, 'DS_RUN',   ws_conteudo, ds_run),
@@ -2244,6 +2261,7 @@ begin
 
 	delete ctb_run       where ID_RUN = prm_ID_RUN ;
 	delete ctb_run_param where ID_RUN = prm_ID_RUN ;
+	fun.bi_log_alt_insere('D','CTB_RUN', prm_id_run, null, sysdate, gbl.getusuario(), null, null); 
 
 	commit;  
 	htp.p('OK|Registro exclu&iacute;do');
@@ -2461,7 +2479,7 @@ begin
          where id_schedule = prm_id_schedule;
     end if; 	
 
-	execute immediate 'select substr('||ws_parametro||',1,3990) from ctb_run_schedule where id_schedule = :p1' into ws_vl_old using in prm_id_schedule;
+	execute immediate 'select substr(max('||ws_parametro||'),1,3990) from ctb_run_schedule where id_schedule = :p1' into ws_vl_old using in prm_id_schedule;
 
 	update ctb_run_schedule
 	   set nr_dia_semana   = decode(ws_parametro, 'NR_DIA_SEMANA', ws_conteudo, ws_dia_semana ), 
@@ -2500,6 +2518,7 @@ procedure ctb_run_schedule_delete (prm_id_schedule varchar2 ) as
 begin 
 
 	delete ctb_run_schedule where id_schedule = prm_id_schedule ;
+	fun.bi_log_alt_insere('D','CTB_RUN_SCHEDULE', prm_id_schedule, null, sysdate, gbl.getusuario(), null, null); 
 
 	commit;  
 	htp.p('OK|Registro exclu&iacute;do');
@@ -2712,7 +2731,7 @@ begin
 		end if; 	
 	end if; 
 
-	execute immediate 'select substr('||ws_parametro||',1,3990) from ctb_run_acoes where id_run_acao = :p1' into ws_vl_old using in prm_id_run_acao;
+	execute immediate 'select substr(max('||ws_parametro||'),1,3990) from ctb_run_acoes where id_run_acao = :p1' into ws_vl_old using in prm_id_run_acao;
 
 	update ctb_run_acoes
 	   set ordem         = decode(ws_parametro, 'ORDEM',         ws_conteudo, ordem),
@@ -2772,6 +2791,7 @@ procedure ctb_run_acoes_delete (prm_id_run_acao varchar2 ) as
 begin 
 
 	delete ctb_run_acoes where id_run_acao = prm_id_run_acao ;
+	fun.bi_log_alt_insere('D','CTB_RUN_ACOES', prm_id_run_acao, null, sysdate, gbl.getusuario(), null, null); 
 
 	commit;  
 	htp.p('OK|Registro exclu&iacute;do');
@@ -2840,6 +2860,7 @@ procedure ctb_run_param_update ( prm_ID_RUN        varchar2,
 	ws_conteudo  varchar2(32000); 
 	ws_ID_RUN    varchar2(30); 
 	ws_erro      varchar2(300); 
+	ws_vl_old    varchar2(4000);
 	ws_nr_aux    integer; 
 	raise_erro   exception;
 begin 
@@ -2866,15 +2887,20 @@ begin
 		end if; 	
 	end if; 
 
+	select substr(max(conteudo),1,3990) into ws_vl_old from ctb_run_param 
+	 where cd_parametro  = ws_parametro 
+	   and id_run        = prm_id_run;
 
 	update ctb_run_param 
 	   set conteudo      = decode(prm_campo,'CONTEUDO'     ,ws_conteudo,conteudo) 
 	 where cd_parametro  = ws_parametro 
-	   and ID_RUN        = prm_ID_RUN;
+	   and ID_RUN        = prm_id_run;
 	if sql%notfound then 
 		ws_erro := 'Par&acirc;metro n&atilde;o localizado para atualiza&ccedil;&atilde;o'; 
 		raise raise_erro; 
 	end if;
+
+	fun.bi_log_alt_insere('U', 'CTB_RUN_PARAM', prm_id_run||'-'||ws_parametro,  'CONTEUDO', sysdate, gbl.getusuario(), ws_vl_old, substr(ws_conteudo,1,3990) ); 
 
 	commit; 
 	htp.p('OK|Registro alterado');
