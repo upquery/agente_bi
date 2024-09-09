@@ -59,9 +59,6 @@ procedure request_begin (  p_id_cliente     varchar2 default null,
 
 begin
 
-insert into dwu.err_txt values ('a0');
-commit; 
-
      -- Verifica se tem versão mais recente do AGENTE, e retorna o link de download da nova versão 
      if  substr(p_versao,1,1) <> '0' then
           begin
@@ -443,8 +440,6 @@ procedure upload ( p_documento      IN  varchar2 default null,
 
 begin
 
-insert into dwu.err_txt values ('a1');
-commit; 
      ws_sysdate := sysdate; 
      ws_status  := 'AGUARD.INSERCAO'; 
      ws_erro    := null; 
@@ -482,15 +477,14 @@ commit;
 
      htp.p('OK=['||p_id_acao||']');
 
-exception
-     when others then
-          insert into err_txt values (TO_CHAR(SYSDATE,'YYYYMMDD HH24:MI:SS')||' - AGENTC.upload: '||DBMS_UTILITY.FORMAT_ERROR_STACK||' - '||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-          commit;
-
+exception when others then
+     insert into ctb_erros (id_cliente, check_id, id_acao, nm_processo, dt_erro, ds_erro) values (p_id_cliente,p_check_id,p_id_acao,'UPLOAD',sysdate, 'Erro:'||substr(DBMS_UTILITY.FORMAT_ERROR_STACK||' - '||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,1,3000)); 
+     commit;
 end upload;
 
-procedure uptest ( p_documento      IN  varchar2 default null ) as
 
+
+procedure uptest as
      l_nome_real         varchar2(1000);
      ws_check            number;
      ws_nocheck          exception;

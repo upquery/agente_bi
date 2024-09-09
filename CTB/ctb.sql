@@ -324,8 +324,10 @@ procedure exec_schdl as
 
     cursor c_tarefas is
     	select s.ID_RUN, nr_dia_mes, s.nr_dia_semana, nr_mes, nr_hora, nr_minuto
-      	  from ctb_run r, ctb_run_schedule s
-         where r.ID_RUN  = s.ID_RUN 
+      	  from ctb_clientes c, ctb_run r, ctb_run_schedule s
+         where c.id_cliente = r.id_cliente 
+		   and r.ID_RUN     = s.ID_RUN 
+		   and c.habilitado = 'S'            -- somente usuário habilitado 
 	       and nvl(r.st_ativo,'N')  = 'S' ;  -- somente tarefas ativa
 
 	ws_reg_online       varchar2(100);
@@ -1963,12 +1965,17 @@ begin
 			for a in c1 loop
 				ws_ds_log    := replace(fun.html_trans(a.ds_erro),chr(10),'<br>');
 				ws_dados_doc := ctb.b2c(a.blob_content);
-				if length(ws_dados_doc) > 2000 then 
-					ws_dados_doc := substr(ws_dados_doc,1,2000);
-					ws_dados_doc := replace(fun.html_trans(ws_dados_doc),chr(10),'<br>')||'<br> ...';
-				else
-					ws_dados_doc := replace(fun.html_trans(ws_dados_doc),chr(10),'<br>');
-				end if; 	
+				if ws_dados_doc is null or length(ws_dados_doc) = 0 then 
+					ws_dados_doc := ' ';
+				else 
+					if length(ws_dados_doc) > 2000 then 
+						ws_dados_doc := substr(ws_dados_doc,1,2000);
+						ws_dados_doc := replace(fun.html_trans(ws_dados_doc),chr(10),'<br>')||'<br> ...';
+					else
+						ws_dados_doc := replace(fun.html_trans(ws_dados_doc),chr(10),'<br>');
+					end if; 	
+				end if; 
+
 
 				htp.p('<tr>');
 					htp.p('<td class="ctb_col_ds_acao" style="width: 130px;">     <input disabled title="'||a.name||'" value="'||a.name||'"/></td>');					
@@ -2178,6 +2185,7 @@ procedure ctb_run_update ( prm_ID_RUN       varchar2,
 	ws_parametro varchar2(4000);
 	ws_conteudo  varchar2(32000); 
 	ws_erro      varchar2(300); 
+	ws_vl_old    varchar2(4000);
 	raise_erro   exception;
 begin 
 	ws_parametro := upper(trim(prm_cd_parametro)); 
@@ -2188,6 +2196,8 @@ begin
 		raise raise_erro; 
 	end if; 	
 
+	execute immediate 'select substr('||ws_parametro||',1,3990) from ctb_run where id_run = :id_run' into ws_vl_old using in prm_id_run;
+
 	update ctb_run  
 	   set ds_run   = decode(ws_parametro, 'DS_RUN',   ws_conteudo, ds_run),
 	       st_ativo = decode(ws_parametro, 'ST_ATIVO', ws_conteudo, st_ativo)
@@ -2197,6 +2207,8 @@ begin
 		raise raise_erro; 
 	end if;  	    
 
+	fun.bi_log_alt_insere('U','CTB_RUN', prm_id_run, ws_parametro, sysdate, gbl.getusuario(), ws_vl_old, substr(ws_conteudo,1,3990)); 
+	
 	commit; 
 	htp.p('OK|Registro alterado');
 
@@ -2400,6 +2412,7 @@ procedure ctb_run_schedule_update ( prm_id_schedule   varchar2,
     ws_dia_mes    varchar2(4000) := null;
 	ws_erro       varchar2(300); 
     ws_count      number;
+	ws_vl_old     varchar2(4000);
 	raise_erro    exception;
 
 begin 
@@ -2448,6 +2461,8 @@ begin
          where id_schedule = prm_id_schedule;
     end if; 	
 
+	execute immediate 'select substr('||ws_parametro||',1,3990) from ctb_run_schedule where id_schedule = :p1' into ws_vl_old using in prm_id_schedule;
+
 	update ctb_run_schedule
 	   set nr_dia_semana   = decode(ws_parametro, 'NR_DIA_SEMANA', ws_conteudo, ws_dia_semana ), 
 	   	   nr_dia_mes      = decode(ws_parametro, 'NR_DIA_MES',    ws_conteudo, ws_dia_mes ),  
@@ -2459,6 +2474,8 @@ begin
 		ws_erro := 'N&atilde;o localizado agendamento com esse ID, recarrega a tela e tente novamente'; 
 		raise raise_erro; 
 	end if;  	    
+
+	fun.bi_log_alt_insere('U', 'CTB_RUN_SCHEDULE', prm_id_schedule,  ws_parametro, sysdate, gbl.getusuario(), ws_vl_old, substr(ws_conteudo,1,3900) ); 
 
 	commit; 
 	htp.p('OK|Registro alterado');
@@ -2661,12 +2678,14 @@ procedure ctb_run_acoes_update ( prm_id_run_acao   varchar2,
 	ws_id_run             varchar2(30); 
 	ws_id_cliente 	 	  varchar2(50);
 	ws_id_conexao   	  varchar2(50);
+	ws_id_conexao_new  	  varchar2(50);
 	ws_id_sistema_acao    varchar2(50) := null;
 	ws_id_sistema_con     varchar2(50) := null;
 	ws_id_tipo_banco_acao varchar2(50) := null;
 	ws_id_tipo_banco_con  varchar2(50) := null;
 
 	ws_erro      varchar2(300); 
+	ws_vl_old    varchar2(4000);
 	ws_count     integer; 
 	raise_erro   exception;
 begin 
@@ -2693,6 +2712,8 @@ begin
 		end if; 	
 	end if; 
 
+	execute immediate 'select substr('||ws_parametro||',1,3990) from ctb_run_acoes where id_run_acao = :p1' into ws_vl_old using in prm_id_run_acao;
+
 	update ctb_run_acoes
 	   set ordem         = decode(ws_parametro, 'ORDEM',         ws_conteudo, ordem),
 	       id_acao       = decode(ws_parametro, 'ID_ACAO',       ws_conteudo, id_acao),
@@ -2704,26 +2725,32 @@ begin
 		raise raise_erro; 
 	end if;
 
+	fun.bi_log_alt_insere('U', 'CTB_RUN_ACOES', prm_id_run_acao,  ws_parametro, sysdate, gbl.getusuario(), ws_vl_old, substr(ws_conteudo,1,3990) ); 
+
 	if ws_parametro = 'ID_ACAO' then 
 		select min(id_sistema), min(id_tipo_banco) into ws_id_sistema_acao, ws_id_tipo_banco_acao from ctb_acoes where id_cliente = ws_id_cliente and id_acao = ws_conteudo;		
+		ws_id_conexao_new := ws_id_conexao;
 		if ws_id_conexao is not null then  
 			-- limpa a conexão se a conexão existente não for do mesmo sistema e tipo de banco 
 			select min(conteudo) into ws_id_sistema_con    from ctb_conexoes where id_cliente = ws_id_cliente and id_conexao = ws_id_conexao and cd_parametro = 'SISTEMA';
 			select min(conteudo) into ws_id_tipo_banco_con from ctb_conexoes where id_cliente = ws_id_cliente and id_conexao = ws_id_conexao and cd_parametro = 'DB';
 			if nvl(ws_id_sistema_acao,'.') <> nvl(ws_id_sistema_con,'.') or nvl(ws_id_tipo_banco_acao,'.') <> nvl(ws_id_tipo_banco_con,'.') then 
-				ws_id_conexao := null;
+				ws_id_conexao_new := null;
 			end if;
 		else 
 			-- se a conexao estiver em branco procura uma que seja do mesmo sistema e tipo de banco da açao 
-			select min(id_conexao ) into ws_id_conexao
+			select min(id_conexao ) into ws_id_conexao_new
 			 from ctb_conexoes
              where (id_cliente, id_conexao) in (select b.id_cliente, b.id_conexao from ctb_conexoes b where id_cliente = ws_id_cliente and cd_parametro = 'SISTEMA' and conteudo = ws_id_sistema_acao)
                and (id_cliente, id_conexao) in (select b.id_cliente, b.id_conexao from ctb_conexoes b where id_cliente = ws_id_cliente and cd_parametro = 'DB'      and conteudo = ws_id_tipo_banco_acao);
 		end if;
 
-		update ctb_run_acoes set id_conexao = ws_id_conexao
+		update ctb_run_acoes set id_conexao = ws_id_conexao_new
 		where id_run_acao = prm_id_run_acao;			
 
+		if nvl(ws_id_conexao,'.') <> nvl(ws_id_conexao_new,'.') then 
+			fun.bi_log_alt_insere('U', 'CTB_RUN_ACOES', prm_id_run_acao,  'ID_CONEXAO', sysdate, gbl.getusuario(), ws_id_conexao, ws_id_conexao_new ); 
+		end if; 
 	end if; 
 
 	commit; 
@@ -2866,20 +2893,31 @@ end ctb_run_param_update;
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure ctb_run_exec (prm_ID_RUN      varchar2,
                         prm_id_run_acao varchar2 default null) as
+	ws_count      number;
 	ws_erro       varchar2(200) := null; 
 begin
 
-	ctb.exec_run(prm_ID_RUN, prm_id_run_acao, ws_erro);
+	select count(*) into ws_count 
+	 from ctb_clientes cl, ctb_run ru
+	 where cl.id_cliente = ru.id_cliente
+	   and ru.id_run     = prm_id_run
+	   and cl.habilitado = 'S';
+
+	if ws_count = 0 then 
+		ws_erro := 'Cliente n&atilde;o est&aacute; habilitado para integra&ccedil;&atilde;o.'; 
+	else 
+		ctb.exec_run(prm_ID_RUN, prm_id_run_acao, ws_erro);
+	end if; 	
 
 	if ws_erro is null then 
-		htp.p('OK|Tarefa iniciada com sucesso, acompanhe a execu&ccedil;&atilde;o pelo log'); 
+		htp.p('OK|'||fun.lang('Tarefa iniciada com sucesso, acompanhe a execu&ccedil;&atilde;o pelo log')); 
 	else 
-		htp.p('ERRO|'||ws_erro); 
+		htp.p('ERRO|'||fun.lang(ws_erro)); 
 	end if; 	
 exception 
 	when others then
 		ws_erro := 'Erro iniciando Tarefa, verifique o log de erros do sistema';
-		htp.p('ERRO|'||ws_erro); 
+		htp.p('ERRO|'||fun.lang(ws_erro)); 
 		insert into bi_log_sistema (dt_log, ds_log, nm_usuario, nm_procedure) values (sysdate , 'ctb_run_exec('||prm_ID_RUN||') erro: '||substr(dbms_utility.format_error_stack||'-'||dbms_utility.format_error_backtrace,1,3900) , gbl.getUsuario, 'ERRO');
         commit; 
 end ctb_run_exec; 

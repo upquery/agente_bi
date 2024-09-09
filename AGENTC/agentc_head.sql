@@ -41,7 +41,7 @@ create or replace package     agentc is
                                  p_check_id        varchar2 default null,
                                  p_id_acao         varchar2 default null );
 
-     procedure uptest (          p_documento       IN varchar2 default null);
+     procedure uptest ;
 
 
      procedure error_domweb (
