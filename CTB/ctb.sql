@@ -2087,7 +2087,7 @@ begin
 			
 			-- Atualiza o status das tarefas 
 			for a in c1 loop 
-				ctb_atu_status_run (a.ID_RUN, ws_status); 	
+				ctb.ctb_atu_status_run (a.ID_RUN, ws_status); 	
 			end loop; 	
 
 			for a in c1 loop 
