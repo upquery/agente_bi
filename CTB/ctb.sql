@@ -455,7 +455,6 @@ begin
 	-- Cancela se a tarefa já estiver em execução 
 	ws_status := null;
 	ctb.ctb_atu_status_run (prm_ID_RUN, ws_status);  
-	commit; 
 
 	if prm_id_run_acao is not null then 
 		select count(*) into ws_count from ctb_run_acoes
@@ -529,14 +528,16 @@ begin
 
 exception 
 	when ws_raise_run then  
+		ctb.ctb_atu_status_run (prm_ID_RUN, ws_status);  
 		prm_retorno := ws_erro; 
 		insert into bi_log_sistema (dt_log, ds_log, nm_usuario, nm_procedure) values (sysdate , 'ctb.exec_run('||prm_ID_RUN||') erro: '||ws_erro, 'DWU', 'ERRO');
         commit;
 	when others then 	
 		rollback; 
+		ctb.ctb_atu_status_run (prm_ID_RUN, ws_status);  
 		prm_retorno := 'Erro iniciando a execu&ccedil;ão, verifique o log de erros do sistema';
 		insert into bi_log_sistema (dt_log, ds_log, nm_usuario, nm_procedure) values (sysdate , 'ctb.exec_run('||prm_ID_RUN||') erro: '||substr(dbms_utility.format_error_stack||dbms_utility.format_error_backtrace,1,3900), 'DWU', 'ERRO');
-        commit;
+		commit;
 end exec_run; 
 
 
@@ -2084,11 +2085,6 @@ begin
 		end if;
 
 		htp.p('<tbody id="ajax" data-dir="'||ws_dir||'">');
-			
-			-- Atualiza o status das tarefas 
-			for a in c1 loop 
-				ctb.ctb_atu_status_run (a.ID_RUN, ws_status); 	
-			end loop; 	
 
 			for a in c1 loop 
 
@@ -2954,7 +2950,8 @@ procedure ctb_run_stop (prm_ID_RUN   varchar2) as
 	ws_usuario       varchar2(100); 
 	ws_qt_run_ext    number; 
 	ws_qt_run_ins    number;
-	ws_status_ins    varchar2(30);  
+	ws_status_ins    varchar2(30);
+	ws_status        varchar2(30);
 	ws_count         number;
 	ws_erro          varchar2(1000); 
 begin 
@@ -2998,6 +2995,8 @@ begin
 		ctb.ctb_atu_status_acao(a.id_run_acao,'CANCELADO'); 
 
 	end loop; 	
+
+	ctb.ctb_atu_status_run (prm_ID_RUN, ws_status);  
 
 	if ws_qt_run_ins > 0 then 
 		htp.p('OK|A tarefa foi parcialmente cancelada, existem a&ccedil;&otilde;es j&aacute; em processo de inser&ccedil;&atilde;o da tabela de destino');

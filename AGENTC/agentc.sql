@@ -541,8 +541,17 @@ end error_domweb;
 
 procedure atu_status_acao ( prm_id_run_acao   number, 
                             prm_status        varchar2 ) as 
-     ws_dt_i   date := null;
-     ws_dt_f   date := null; 
+	ws_qt_er       integer;
+     ws_qt_ca       integer;
+	ws_qt_ag       integer;
+	ws_qt_agi      integer;
+	ws_qt_ext      integer;
+	ws_qt_ins      integer;
+     ws_dt_i        date := null;
+	ws_dt_f        date := null; 
+     ws_id_run      varchar2(50);
+     ws_status      varchar2(50);
+
 begin
 
      if prm_status in ('EXTRAINDO','AGUARDANDO') then 
@@ -556,6 +565,43 @@ begin
             dt_inicio   = nvl(nvl(ws_dt_i, dt_inicio),ws_dt_f),
             dt_fim      = nvl(ws_dt_f, dt_fim)
 	 where id_run_acao = prm_id_run_acao;
+      commit;
+      
+      select max(id_run) into ws_id_run 
+        from ctb_run_acoes
+       where id_run_acao = prm_id_run_acao;
+
+     -- Atualiza também a tarefa 
+	select  sum(decode(status,'ERRO',1,0)), 
+			sum(decode(status,'CANCELADO',1,0)), 
+			sum(decode(status,'AGUARDANDO',1,0)), 
+			sum(decode(status,'AGUARD.INSERCAO',1,0)), 
+			sum(decode(status,'EXTRAINDO',1,0)),
+			sum(decode(status,'INSERINDO',1,0)),
+			max(dt_fim)
+	into ws_qt_er, ws_qt_ca, ws_qt_ag, ws_qt_agi, ws_qt_ext, ws_qt_ins, ws_dt_f
+	from ctb_run_acoes
+	where id_run = ws_id_run; 
+
+	if    ws_qt_ext > 0 then   ws_status := 'EXTRAINDO';
+	elsif ws_qt_ins > 0 then   ws_status := 'INSERINDO'; 
+	elsif ws_qt_ag  > 0 then   ws_status := 'AGUARDANDO'; 
+	elsif ws_qt_agi > 0 then   ws_status := 'AGUARD.INSERCAO'; 
+	elsif ws_qt_er  > 0 then   ws_status := 'ERRO'; 
+	elsif ws_qt_ca  > 0 then   ws_status := 'CANCELADO'; 
+	else                       ws_status := 'CONCLUIDO';  
+	end if; 
+
+    	if ws_status in ('ERRO','CANCELADO','CONCLUIDO') then 
+		ws_dt_f := sysdate;
+	end if; 	
+
+	update ctb_run 
+	   set last_run    = ws_dt_f, 
+	       last_status = ws_status 
+	 where id_run = ws_id_run;
+	commit;  		 
+
 
 exception when others then   
   	insert into bi_log_sistema values(sysdate, 'agentc.atu_status_acao :'||substr(DBMS_UTILITY.FORMAT_ERROR_STACK||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,1,3900), 'AGENTC', 'ERRO');
