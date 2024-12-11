@@ -1470,7 +1470,7 @@ begin
 	ws_usuario        := gbl.getusuario();
 	ws_onkeypress     := ' onkeypress="proxCampo(event,this);"'; 
 	ws_onkeypress_int := ' onkeypress="if(!input(event, ''integer'')) {event.preventDefault();} "';
-	ws_eventoGravar   := ' "requestDefault(''ctb_acoes_update'', ''prm_id_acao=#ID#&prm_cd_parametro=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB'');"'; 
+	ws_eventoGravar   := ' "requestDefault(''ctb_acoes_update'', ''prm_id_cliente=#CLIENTE#&prm_id_acao=#ID#&prm_cd_parametro=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB'');"'; 
 	ws_eventoOrdem    := ' "var dir = order('''', ''ajax''); ajax(''list'', ''ctb_acoes_list'', ''prm_order=#ORDEM#&prm_dir=''+dir, false, ''content'','''','''',''CTB'');"';     
 
 	if prm_id_acao is not null then 
@@ -1504,7 +1504,7 @@ begin
 
 		htp.p('<tbody id="ajax" data-dir="'||ws_dir||'">');
 			for a in c1 loop 
-				ws_evento   := replace(ws_eventoGravar,'#ID#',a.id_acao); 
+				ws_evento   := replace(replace(ws_eventoGravar,'#ID#',a.id_acao),'#CLIENTE#', a.id_cliente); 
 
 				htp.p('<tr id="'||a.id_cliente||'|'||a.id_acao||'">');
 					
