@@ -2652,7 +2652,7 @@ end ctb_run_acoes_list;
 procedure ctb_run_acoes_insert (prm_ID_RUN        varchar2,
                                 prm_ordem         varchar2,
 						        prm_id_acao       varchar2) as 
-	ws_id_cliente    number; 
+	ws_id_cliente    varchar2(30); 
 	ws_id_run_acao   number; 
 	ws_count         integer; 
 	ws_erro          varchar2(300); 
