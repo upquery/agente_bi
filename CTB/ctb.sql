@@ -339,6 +339,9 @@ procedure exec_schdl as
 	ws_check_hora       number     := 0;
 	ws_check_minuto     number     := 0;
 
+    ws_date_atual       date;
+    ws_date_ultimo      date;
+    ws_date_proximo     date;
     ws_date             date;
     ws_dia_semana       integer;
     ws_dia_mes          integer;
@@ -346,47 +349,74 @@ procedure exec_schdl as
     ws_hora             integer;
     ws_minuto           integer;
 	ws_erro             varchar2(4000); 
+	ws_runs             varchar2(4000);
 
  BEGIN
 
-    ws_date       := sysdate;
-    ws_dia_semana := to_number(to_char(ws_date,'D'));
-    ws_dia_mes 	  := to_number(to_char(ws_date,'DD'));
-    ws_mes        := to_number(to_char(ws_date,'MM'));
-    ws_hora       := to_number(to_char(ws_date,'HH24'));
-    ws_minuto     := to_number(to_char(ws_date,'MI'));
-	
     if upper(ctb.ret_var('CTB_ATIVO')) <> 'SIM' then
         raise ws_noact;
     end if;
 
-    for a in c_tarefas loop
-        -- precisa zerar pois pode retornar mais de uma linha...
-        ws_check_semana  := 0;
-        ws_check_dia_mes := 0;
-        ws_check_mes     := 0;	
-        ws_check_hora    := 0;
-        ws_check_minuto  := 0;
-		if (nvl(a.nr_dia_semana,  'N/A') <> 'N/A' or nvl(a.nr_dia_mes, 'N/A') <> 'N/A' ) and 
-		    nvl(a.nr_mes,         'N/A') <> 'N/A' and 
-		    nvl(a.nr_hora,        'N/A') <> 'N/A' and 
-		    nvl(a.nr_minuto,      'N/A') <> 'N/A' then
-		
-            if a.nr_dia_mes is not null then
-                select count(column_value) into ws_check_dia_mes from table(ctb.vpipe(a.nr_dia_mes)) where column_value = ws_dia_mes;
-            end if;
-            if a.nr_dia_semana is not null then
-				select count(column_value) into ws_check_semana  from table(ctb.vpipe(a.nr_dia_semana))  where column_value = ws_dia_semana;
-			end if;
-            select count(column_value) into ws_check_mes    from table(ctb.vpipe(a.nr_mes))    where column_value = ws_mes;
-            select count(column_value) into ws_check_hora   from table(ctb.vpipe(a.nr_hora))   where column_value = ws_hora;
-            select count(column_value) into ws_check_minuto from table(ctb.vpipe(a.nr_minuto)) where column_value = ws_minuto;
-			if (ws_check_dia_mes + ws_check_semana + ws_check_mes + ws_check_hora + ws_check_minuto) >= 4 then
-				ctb.exec_run(a.ID_RUN, null, ws_erro);
-			end if;
-		end if; 
-    end loop;
+    ws_date_atual := sysdate;
+    select max(dh_execucao) into ws_date_ultimo from bi_schdl_log where cd_schdl = 'AGENTE';
+    if ws_date_ultimo is null then
+        ws_date_proximo := trunc(ws_date_atual,'mi');  -- se não tem registro último, considera o atual como próximo 
+    else     
+        ws_date_proximo := trunc(ws_date_ultimo,'mi') + (1/24/60); 
+    end if; 
+    -- Processa minuto a minuto da última execução até agora (atual), se não houve atraso na ultima execução, vai executar somente uma vez com o horário atual 
+    ws_date := ws_date_proximo;
+	while ws_date <= ws_date_atual loop 
 
+		ws_dia_semana := to_number(to_char(ws_date,'D'));
+		ws_dia_mes 	  := to_number(to_char(ws_date,'DD'));
+		ws_mes        := to_number(to_char(ws_date,'MM'));
+		ws_hora       := to_number(to_char(ws_date,'HH24'));
+		ws_minuto     := to_number(to_char(ws_date,'MI'));
+
+		for a in c_tarefas loop
+			-- precisa zerar pois pode retornar mais de uma linha...
+			ws_check_semana  := 0;
+			ws_check_dia_mes := 0;
+			ws_check_mes     := 0;	
+			ws_check_hora    := 0;
+			ws_check_minuto  := 0;
+
+			if (nvl(a.nr_dia_semana,  'N/A') <> 'N/A' or nvl(a.nr_dia_mes, 'N/A') <> 'N/A' ) and 
+				nvl(a.nr_mes,         'N/A') <> 'N/A' and 
+				nvl(a.nr_hora,        'N/A') <> 'N/A' and 
+				nvl(a.nr_minuto,      'N/A') <> 'N/A' then
+			
+				if a.nr_dia_mes is not null then
+					select count(column_value) into ws_check_dia_mes from table(ctb.vpipe(a.nr_dia_mes)) where column_value = ws_dia_mes;
+				end if;
+				if a.nr_dia_semana is not null then
+					select count(column_value) into ws_check_semana  from table(ctb.vpipe(a.nr_dia_semana))  where column_value = ws_dia_semana;
+				end if;
+				select count(column_value) into ws_check_mes    from table(ctb.vpipe(a.nr_mes))    where column_value = ws_mes;
+				select count(column_value) into ws_check_hora   from table(ctb.vpipe(a.nr_hora))   where column_value = ws_hora;
+				select count(column_value) into ws_check_minuto from table(ctb.vpipe(a.nr_minuto)) where column_value = ws_minuto;
+				if (ws_check_dia_mes + ws_check_semana + ws_check_mes + ws_check_hora + ws_check_minuto) >= 4 then
+					ctb.exec_run(a.ID_RUN, null, ws_erro);
+					if ws_runs is not null then
+						ws_runs := ws_runs||', ';
+					end if; 	
+					ws_runs := substr(ws_runs||a.ID_RUN,1,3900);
+				end if;
+			end if; 
+
+		end loop;
+
+        begin 
+            insert into bi_schdl_log (cd_schdl, dh_execucao, dh_registro, run_id ) values ('AGENTE',ws_date,ws_date_atual, ws_runs);
+        exception when others then 
+            insert into log_eventos values(sysdate , '[CTB]-ERRO SCHDL_LOG ['||to_char(ws_date,'dd/mm/rrrr hh24:mi')||']: '||substr(dbms_utility.format_error_stack||dbms_utility.format_error_backtrace,1,3500), user , 'ETL' , 'ERRO', '0');
+            commit;
+        end;     
+
+		ws_date := ws_date + (1/24/60);  -- próxima execução = última execução + 1 minuto
+
+	end loop;
     -- Cria Job para cancelar ações executando a um determinando tempo (não cria o job, se já estiver executando)
     -- ctb.execute_now('ctb.canc_step_tempo_limite', 'N');   
 
@@ -433,7 +463,6 @@ procedure exec_run (prm_ID_RUN             varchar2,
 
 begin
 
-    ws_id_agendamento := to_char(sysdate,'yymmddhh24miss')||'-'||UPPER(ctb.randomCode(5)); 
 	ws_erro := null;
 
 	select min(ru.id_cliente) into ws_id_cliente 
@@ -491,6 +520,7 @@ begin
 	ws_qt_acoes := 0;
 	ws_qt_erros := 0;
 	for a in c_rs loop 
+		ws_id_agendamento := to_char(sysdate,'yymmddhh24miss')||'-'||UPPER(ctb.randomCode(5)); 
 		ws_qt_acoes       := ws_qt_acoes + 1;
 		ws_erro           := null;
 		ws_comando        := a.comando; 
