@@ -29,6 +29,7 @@ procedure exec_schdl;
 
 procedure exec_run (prm_id_run             varchar2,
                     prm_id_run_acao        varchar2 default null,
+					prm_id_schedule        varchar2 default '0',
 					prm_retorno     in out varchar2) ; 
 
 procedure ctb_run_param_atu(prm_id_run varchar2) ;
@@ -36,6 +37,7 @@ procedure ctb_run_param_atu(prm_id_run varchar2) ;
 procedure exec_param_substitui (prm_id_run          in varchar2, 
                                 prm_id_run_acao     in varchar2,
                                 prm_id_acao         in varchar2,
+								prm_id_schedule     in varchar2 default '0',
                                 prm_comando     in out varchar2,
                                 prm_parametros  in out varchar2,
                                 prm_erro        in out varchar2 ) ;
@@ -160,12 +162,14 @@ procedure ctb_run_acoes_delete (prm_id_run_acao varchar2 );
 procedure ctb_run_param_list(prm_id_run     varchar2);
 
 procedure ctb_run_param_update ( prm_id_run        varchar2, 
+								 prm_id_schedule   varchar2,
                            	     prm_cd_parametro  varchar2,
 								 prm_campo         varchar2, 
 						   	     prm_conteudo      varchar2 );
 
 procedure ctb_run_exec (prm_id_run      varchar2,
-                        prm_id_run_acao varchar2 default null); 
+                        prm_id_run_acao varchar2 default null,
+						prm_id_schedule varchar2 default '0'); 
 
 procedure ctb_run_stop (prm_id_run   varchar2);
 

@@ -323,7 +323,7 @@ end ctb_float_menu;
 procedure exec_schdl as 
 
     cursor c_tarefas is
-    	select s.ID_RUN, nr_dia_mes, s.nr_dia_semana, nr_mes, nr_hora, nr_minuto
+    	select s.ID_RUN, s.id_schedule, nr_dia_mes, s.nr_dia_semana, nr_mes, nr_hora, nr_minuto
       	  from ctb_clientes c, ctb_run r, ctb_run_schedule s
          where c.id_cliente = r.id_cliente 
 		   and r.ID_RUN     = s.ID_RUN 
@@ -397,7 +397,7 @@ procedure exec_schdl as
 				select count(column_value) into ws_check_hora   from table(ctb.vpipe(a.nr_hora))   where column_value = ws_hora;
 				select count(column_value) into ws_check_minuto from table(ctb.vpipe(a.nr_minuto)) where column_value = ws_minuto;
 				if (ws_check_dia_mes + ws_check_semana + ws_check_mes + ws_check_hora + ws_check_minuto) >= 4 then
-					ctb.exec_run(a.ID_RUN, null, ws_erro);
+					ctb.exec_run(a.ID_RUN, null, a.id_schedule, ws_erro);
 					if ws_runs is not null then
 						ws_runs := ws_runs||', ';
 					end if; 	
@@ -433,6 +433,7 @@ end exec_schdl;
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure exec_run (prm_ID_RUN             varchar2,
                     prm_id_run_acao        varchar2 default null,
+					prm_id_schedule        varchar2 default '0',
 					prm_retorno     in out varchar2) as
 
     cursor c_rs is
@@ -525,8 +526,8 @@ begin
 		ws_erro           := null;
 		ws_comando        := a.comando; 
 		ws_comando_limpar := a.comando_limpar; 
-		ctb.exec_param_substitui (a.ID_RUN, a.id_run_acao, a.id_acao, ws_comando_limpar, ws_parametros, ws_erro_limpar);  -- Substitui o conteúdo dos parametros 
-    	ctb.exec_param_substitui (a.ID_RUN, a.id_run_acao, a.id_acao, ws_comando,        ws_parametros, ws_erro);         -- Substitui o conteúdo dos parametros 
+		ctb.exec_param_substitui (a.ID_RUN, a.id_run_acao, a.id_acao, prm_id_schedule, ws_comando_limpar, ws_parametros, ws_erro_limpar);  -- Substitui o conteúdo dos parametros 
+    	ctb.exec_param_substitui (a.ID_RUN, a.id_run_acao, a.id_acao, prm_id_schedule, ws_comando,        ws_parametros, ws_erro);         -- Substitui o conteúdo dos parametros 
 
     	if ws_erro_limpar is not null or ws_erro is not null or ws_comando is null then 
 			ws_qt_erros := ws_qt_erros + 1;
@@ -541,8 +542,8 @@ begin
     	end if;     
 
 		ctb.ctb_atu_status_acao(a.id_run_acao, ws_status);
-		insert into ctb_acoes_exec (id_agendamento,    id_cliente,   id_run,   id_run_acao,   id_acao,   id_conexao,   comando,    comando_limpar,    tbl_destino,   status,    dt_criacao, ds_erro) 
-						    values (ws_id_agendamento, a.id_cliente, a.id_run, a.id_run_acao, a.id_acao, a.id_conexao, ws_comando, ws_comando_limpar, a.tbl_destino, ws_status, sysdate,    ws_erro );
+		insert into ctb_acoes_exec (id_agendamento,    id_cliente,   id_run,   id_run_acao,   id_acao,   id_conexao,   comando,    comando_limpar,    tbl_destino,   status,    dt_criacao, ds_erro, id_schedule) 
+						    values (ws_id_agendamento, a.id_cliente, a.id_run, a.id_run_acao, a.id_acao, a.id_conexao, ws_comando, ws_comando_limpar, a.tbl_destino, ws_status, sysdate,    ws_erro, prm_id_schedule );
 	end loop; 	
 
 	ctb.ctb_atu_status_run (prm_ID_RUN, ws_status);  -- Atualiza e retorna o status das ações e da tarefa 
@@ -582,7 +583,7 @@ procedure ctb_run_param_atu(prm_ID_RUN varchar2) as
     ws_count integer; 
 begin 
 
-    for a in (select ac.comando, ac.comando_limpar
+    for a in (select ra.id_run, ac.comando, ac.comando_limpar
    				 from ctb_acoes ac, ctb_run_acoes ra
   				where ac.id_acao = ra.id_acao 
     			  and ra.ID_RUN  = prm_ID_RUN) loop
@@ -597,14 +598,21 @@ begin
             if ws_pos_i > 0 and ws_pos_f > 0 then 
                 ws_param   := trim(substr(ws_comando, ws_pos_i, ws_pos_f - ws_pos_i + 1 ));
                 ws_param   := replace(replace(ws_param,'$['),']'); 
-                if length(ws_param) > 0 then 
-                    update ctb_run_param 
-                       set cd_parametro = ws_param
-                     where ID_RUN       = prm_ID_RUN
-                       and cd_parametro = ws_param;
-                    if sql%notfound then 
-                        insert into ctb_run_param (ID_RUN,cd_parametro,st_ativo ) values (prm_ID_RUN, ws_param, 'S'); 
-                    end if; 
+                if length(ws_param) > 0 then
+					for b in (select id_schedule from ctb_run_schedule t1 where t1.id_run = a.ID_RUN union all 
+		  					  select '0' from dual 
+				 			order by 1) loop 
+						insert into err_txt values ('a2:'||b.id_schedule);								
+						update ctb_run_param 
+						set cd_parametro = ws_param
+						where ID_RUN       = prm_ID_RUN
+						  and id_schedule  = b.id_schedule 
+						  and cd_parametro = ws_param;
+						if sql%notfound then 
+							insert into ctb_run_param (ID_RUN,     cd_parametro, st_ativo, id_entreaspas, id_schedule ) 
+							                   values (prm_ID_RUN, ws_param    , 'S'     ,'N'           , b.id_schedule ); 
+						end if; 
+					end loop; 
                 end if; 
                 ws_comando := substr(ws_comando, ws_pos_f + 1, 99999);
             else     
@@ -614,17 +622,26 @@ begin
     end loop;
     commit; 
     --
-
+    -- Exclui parametros de agendas excluidas 
+    delete ctb_run_param pa
+     where pa.id_run      = prm_ID_RUN
+       and pa.id_schedule <> '0'
+       and pa.id_schedule not in (select sc.id_schedule from ctb_run_schedule sc where sc.id_run = prm_ID_RUN );
+    --
 	select count(*) into ws_count from ctb_run_param where ID_RUN = prm_ID_RUN and cd_parametro = 'MINUTO_ESPERA';
 	if ws_count = 0 then 
-		insert into ctb_run_param (ID_RUN, cd_parametro, conteudo, st_ativo) values (prm_ID_RUN, 'MINUTO_ESPERA', 30,'S'); 
+		insert into ctb_run_param (ID_RUN, cd_parametro, conteudo, st_ativo, id_entreaspas, id_schedule) values (prm_ID_RUN, 'MINUTO_ESPERA', 30,'S','N','0'); 
 	end if; 	
-	
 	select count(*) into ws_count from ctb_run_param where ID_RUN = prm_ID_RUN and cd_parametro = 'MINUTO_ESPERA_PLSQL';
 	if ws_count = 0 then 
-		insert into ctb_run_param (ID_RUN, cd_parametro, conteudo, st_ativo) values (prm_ID_RUN, 'MINUTO_ESPERA_PLSQL', 180,'S');   -- 3 horas
+		insert into ctb_run_param (ID_RUN, cd_parametro, conteudo, st_ativo, id_entreaspas, id_schedule) values (prm_ID_RUN, 'MINUTO_ESPERA_PLSQL', 180,'S','N','0');   -- 3 horas
 	end if; 	
 	--
+exception 
+	when others then 	
+		rollback; 
+		insert into bi_log_sistema (dt_log, ds_log, nm_usuario, nm_procedure) values (sysdate , 'ctb.ctb_run_param_atu('||prm_ID_RUN||') erro: '||substr(dbms_utility.format_error_stack||dbms_utility.format_error_backtrace,1,3900), 'DWU', 'ERRO');
+		commit;	
 end ctb_run_param_atu; 
 
 
@@ -632,6 +649,7 @@ end ctb_run_param_atu;
 procedure exec_param_substitui (prm_ID_RUN          in varchar2, 
                                 prm_id_run_acao     in varchar2,
                                 prm_id_acao         in varchar2,
+								prm_id_schedule     in varchar2 default '0',
                                 prm_comando     in out varchar2,
                                 prm_parametros  in out varchar2,
                                 prm_erro        in out varchar2 ) as 
@@ -654,13 +672,16 @@ begin
 	ws_comando    := regexp_replace(ws_comando,'#\[TBL_DESTINO]', ws_tbl_destino  ,1,0,'i');
 	prm_erro      := null;
 
-    for a in (select '$['||cd_parametro||']' as parametro, conteudo, cd_parametro
+    for a in (select '$['||cd_parametro||']' as parametro, conteudo, cd_parametro, id_entreaspas
                 from ctb_run_param 
                where ID_RUN = prm_ID_RUN 
+			     and id_schedule in ('0', prm_id_schedule)
                  and instr(upper(ws_comando), '$['||cd_parametro||']') > 0
+			  order by decode(id_schedule,prm_id_schedule,1,2)	 -- tenta substituir primeiro parametros do mesmo schedule, se não existir pega do padrão 0
              ) loop
 
         ws_conteudo      := a.conteudo;
+		ws_id_entreaspas := nvl(a.id_entreaspas,'N');
         if ws_conteudo is null then
             ws_erro := a.parametro; 
             raise ws_raise_param;     
@@ -669,7 +690,11 @@ begin
         if instr(upper(ws_conteudo),'EXEC=') > 0 then 
             ws_conteudo := replace(ws_conteudo,'exec=','EXEC='); 
             ws_conteudo := ctb.xexec (ws_conteudo); 
-        end if;     
+        end if;  
+        if ws_id_entreaspas = 'S' then 
+            ws_conteudo := chr(39)||ws_conteudo||chr(39);
+        end if;    
+   
         ws_comando := replace(ws_comando,  a.parametro, ws_conteudo );
         if ws_parametros is not null then 
             ws_parametros := ws_parametros||', ';
@@ -2326,6 +2351,7 @@ begin
 
 		htp.p('<thead>');
 			htp.p('<tr>');
+				HTP.P('<th>'||FUN.LANG('ID')||'</th>');
 				HTP.P('<th>'||FUN.LANG('DIAS DA SEMANA')||'</th>');
                 HTP.P('<th>'||FUN.LANG('DIAS DO M&Ecirc;S')||'</th>');
 				HTP.P('<th>'||FUN.LANG('M&Ecirc;S')||'</th>');
@@ -2341,11 +2367,13 @@ begin
 
 				htp.p('<tr id="'||a.id_schedule||'">');
 
+					htp.p('<td><span style="font-weight: bold;">'||a.id_schedule||'</span></td>');
+
 					ws_desc := null;
 					open  c_lista ('DIA_SEMANA', a.nr_dia_semana);
 					fetch c_lista into ws_desc;
 					close c_lista; 
-					htp.p('<td>');
+					htp.p('<td class="fake-list">');
 						htp.p('<a class="script" data-default="'||a.nr_dia_semana||'" onclick="'||replace(replace(replace(replace(ws_eventoVerificar, '#CAMPO#', '-dia_mes'), '#DOCAMPO1#', 'do M&ecirc;s'), '#DOCAMPO2#', 'da Semana'), '#GRAVAR#', replace(replace(ws_eventoGravar,'#CAMPO#','NR_DIA_SEMANA'), '#ID#', a.id_schedule))||'"></a>');
 						fcl.fakeoption(a.id_schedule||'-semanas', '', a.nr_dia_semana, 'lista-semanas', 'N', 'S', prm_desc => ws_desc );						
 					htp.p('</td>');
@@ -2372,7 +2400,7 @@ begin
 					open  c_lista ('HORA', a.nr_hora);
 					fetch c_lista into ws_desc;
 					close c_lista;
-					htp.p('<td>');
+					htp.p('<td class="fake-list">');
 						htp.p('<a class="script" data-default="'||a.nr_hora||'" onclick="'||replace(replace(ws_eventoGravar,'#CAMPO#','NR_HORA'), '#ID#', a.id_schedule)||'"></a>');
 						fcl.fakeoption(a.id_schedule||'-horas', '', a.nr_hora, 'lista-horas', 'N', 'S', prm_desc => ws_desc, prm_min => 1);
 					htp.p('</td>');
@@ -2381,7 +2409,7 @@ begin
 					open  c_lista ('MINUTO', a.nr_minuto);
 					fetch c_lista into ws_desc;
 					close c_lista; 
-					htp.p('<td>');
+					htp.p('<td class="fake-list">');
 						htp.p('<a class="script" data-default="'||a.nr_minuto||'" onclick="'||replace(replace(ws_eventoGravar,'#CAMPO#','NR_MINUTO'), '#ID#', a.id_schedule)||'"></a>');
 						fcl.fakeoption(a.id_schedule||'-minutos', '', a.nr_minuto, 'lista-minutos', 'N', 'S', prm_desc => ws_desc, prm_min => 1);
 					htp.p('</td>');
@@ -2836,13 +2864,15 @@ procedure ctb_run_param_list(prm_ID_RUN     varchar2) as
 	ws_evento       varchar2(2000);
 	ws_eventoGravar varchar2(2000);
 	ws_conteudo     ctb_run_param.conteudo%type; 
+	ws_id_ante      etl_run_param.schedule_id%type; 
+	ws_ds_schedule  varchar2(500);
 begin 
 
 	-- Atualiza os parametros da tarefa, caso tenha sido adicionado algum novo parametro nas ações - já tem commit na procedure 
 	ctb.ctb_run_param_atu(prm_ID_RUN); 
 
-	ws_eventoGravar := '"requestDefault(''ctb_run_param_update'', ''prm_ID_RUN=#ID#&prm_cd_parametro=#PAR#&prm_campo=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB''); "'; 
-	ws_eventoGravar := '"requestDefault(''ctb_run_param_update'', ''prm_ID_RUN=#ID#&prm_cd_parametro=#PAR#&prm_campo=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB''); "'; 
+	ws_eventoGravar := '"requestDefault(''ctb_run_param_update'', ''prm_ID_RUN=#ID#&prm_id_schedule=#ID_SCH#&prm_cd_parametro=#PAR#&prm_campo=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB''); "'; 
+	--ws_eventoGravar := '"requestDefault(''ctb_run_param_update'', ''prm_ID_RUN=#ID#&prm_cd_parametro=#PAR#&prm_campo=#CAMPO#&prm_conteudo=''+#VALOR#,this,#VALOR#,'''',''CTB''); "'; 
 
 	htp.p('<input type="hidden" id="content-atributos" data-pkg="ctb" data-par-col="prm_ID_RUN" data-par-val="'||prm_ID_RUN||'">');
 	htp.p('<input type="hidden" id="prm_ID_RUN" value="'||prm_ID_RUN||'">');	
@@ -2852,24 +2882,42 @@ begin
 	htp.p('<table class="linha">');
 		htp.p('<thead>');
 			htp.p('<tr>');
+				HTP.P('<th title="Agenda de execu&ccedil;&atilde;o.">'                                  ||FUN.LANG('AGENDA')||'</th>');			
 				HTP.P('<th title="Nome par&acirc;metro.">'                                              ||FUN.LANG('NOME/ID PAR&Acirc;METRO')||'</th>');
+				HTP.P('<th title="Colocar conte&uacute;do entre aspas" style="text-align: center;">'    ||FUN.LANG('ENTRE ASPAS')||'</th>');
 				HTP.P('<th title="Conte&uacute;do/valor do par&acirc;metro.">'                          ||FUN.LANG('CONTE&Uacute;DO / VALOR')||'</th>');
 			htp.p('</tr>');
 		htp.p('</thead>');
 
 		htp.p('<tbody id="ajax" >');
-			for a in (select ID_RUN, cd_parametro, conteudo 
+			ws_id_ante := null;
+			for a in (select ID_RUN, cd_parametro, conteudo, id_entreaspas, decode(nvl(id_entreaspas,'N'),'S','checked','') checked, 
+			                 id_schedule, decode(id_schedule,'0','PADR&Atilde;O',id_schedule) ds_schedule
 			            from ctb_run_param 
-					   where ID_RUN           = prm_ID_RUN 
+					   where ID_RUN            = prm_ID_RUN 
 					     and nvl(st_ativo,'S') = 'S' 
-			           order by decode(cd_parametro,'MINUTO_ESPERA',1, 'MINUTO_ESPERA_PLSQL',2,3), cd_parametro ) loop
-				
-				ws_evento := replace(replace(ws_eventoGravar,'#ID#', a.ID_RUN),'#PAR#', a.cd_parametro); 
+			           order by id_schedule, decode(cd_parametro,'MINUTO_ESPERA',1, 'MINUTO_ESPERA_PLSQL',2,3), cd_parametro ) loop
+				if nvl(ws_id_ante,a.id_schedule) <> a.id_schedule then 
+					select substr(max('Dias m&ecirc;s ('||nr_dia_mes||') - Dias semana ('||nr_dia_semana||') - M&ecirc;s ('||nr_mes||') - Horas ('||nr_hora||') - Minutos ('||nr_minuto||')'),1,499) into ws_ds_schedule
+					from ctb_run_schedule 
+				   where id_run      = prm_ID_RUN
+				     and id_schedule = a.id_schedule;
+					htp.p('<tr style="background: #F2EFEF;"><td colspan=4>AGENDA EXECU&Ccedil;&Atilde;O:&nbsp;&nbsp;&nbsp;'||a.id_schedule||'&nbsp;&nbsp;&nbsp;- '||ws_ds_schedule||'</td></tr>');
+				end if; 	
+
+				ws_id_ante  := a.id_schedule;
+				ws_evento   := replace(replace(replace(ws_eventoGravar,'#ID#', a.ID_RUN),'#ID_SCH#', a.id_schedule),'#PAR#', a.cd_parametro); 
 				ws_conteudo := replace(a.conteudo,'"', '&#34;');
 				htp.p('<tr id="'||a.ID_RUN||'">');
+					htp.p('<td class="ctb_id_schedule"> <div title="'||a.id_schedule||'">'||a.ds_schedule||'</div></td>');
 					htp.p('<td class="ctb_cd_parametro"><div title="'||a.cd_parametro||'">'||a.cd_parametro||'</div></td>');
-					htp.p('<td><input id="prm_conteudo_'||a.ID_RUN||'" style="border: none;" data-min="1" data-default="'||ws_conteudo||'" value="'||ws_conteudo||'" '||
-						  'onblur='||replace(replace(ws_evento,'#CAMPO#','CONTEUDO'),'#VALOR#','this.value')||' /></td>');
+					if a.cd_parametro like 'MINUTO_ESPERA%' then 
+						htp.p('<td class="ctb_entreaspas"></td>');
+					else 
+						htp.p('<td class="ctb_entreaspas">  <div><input id="prm_id_entreaspas_'||a.cd_parametro||'" data-min="1" value="'||a.id_entreaspas||'" type="checkbox" '||a.checked||' onchange='||replace(replace(ws_evento,'#CAMPO#','ID_ENTREASPAS'),'#VALOR#','((this.checked)?''S'':''N'')')||' /></div></td>');
+					end if;	
+					htp.p('<td><input id="prm_conteudo_'||a.ID_RUN||'" style="border: none;" data-min="1" data-default="'||ws_conteudo||'" value="'||ws_conteudo||'" onblur='||replace(replace(ws_evento,'#CAMPO#','CONTEUDO'),'#VALOR#','this.value')||' /></td>');
+					--htp.p('<td><input id="prm_id_entreaspas_'||a.cd_parametro||'" data-min="1" value="'||a.id_entreaspas||'" type="checkbox" '||ws_checked||' onchange='||replace(replace(ws_evento,'#CAMPO#','ID_ENTREASPAS'),'#VALOR#','((this.checked)?''S'':''N'')')||' /></td>');											  
 				htp.p('</tr>');						
 			end loop; 	
 		htp.p('</tbody>');
@@ -2878,7 +2926,8 @@ begin
 end ctb_run_param_list; 
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-procedure ctb_run_param_update ( prm_ID_RUN        varchar2, 
+procedure ctb_run_param_update ( prm_ID_RUN        varchar2,
+								 prm_id_schedule   varchar2,
                            	     prm_cd_parametro  varchar2,
 								 prm_campo         varchar2, 
 						   	     prm_conteudo      varchar2 ) as 
@@ -2915,18 +2964,21 @@ begin
 
 	select substr(max(conteudo),1,3990) into ws_vl_old from ctb_run_param 
 	 where cd_parametro  = ws_parametro 
-	   and id_run        = prm_id_run;
+	   and id_run        = prm_id_run
+	   and id_schedule   = prm_id_schedule;
 
 	update ctb_run_param 
-	   set conteudo      = decode(prm_campo,'CONTEUDO'     ,ws_conteudo,conteudo) 
+	   set conteudo      = decode(prm_campo,'CONTEUDO'     ,ws_conteudo,conteudo),
+	       id_entreaspas = decode(prm_campo,'ID_ENTREASPAS',ws_conteudo,id_entreaspas)
 	 where cd_parametro  = ws_parametro 
-	   and ID_RUN        = prm_id_run;
+	   and ID_RUN        = prm_id_run
+	   and id_schedule   = prm_id_schedule;
 	if sql%notfound then 
 		ws_erro := 'Par&acirc;metro n&atilde;o localizado para atualiza&ccedil;&atilde;o'; 
 		raise raise_erro; 
 	end if;
 
-	fun.bi_log_alt_insere('U', 'CTB_RUN_PARAM', prm_id_run||'-'||ws_parametro,  'CONTEUDO', sysdate, gbl.getusuario(), ws_vl_old, substr(ws_conteudo,1,3990) ); 
+	fun.bi_log_alt_insere('U', 'CTB_RUN_PARAM', prm_id_run||'-'||prm_id_schedule||'-'||ws_parametro,  'CONTEUDO', sysdate, gbl.getusuario(), ws_vl_old, substr(ws_conteudo,1,3990) ); 
 
 	commit; 
 	htp.p('OK|Registro alterado');
@@ -2944,7 +2996,8 @@ end ctb_run_param_update;
 
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 procedure ctb_run_exec (prm_ID_RUN      varchar2,
-                        prm_id_run_acao varchar2 default null) as
+                        prm_id_run_acao varchar2 default null,
+						prm_id_schedule varchar2 default '0') as
 	ws_count      number;
 	ws_erro       varchar2(200) := null; 
 begin
@@ -2958,7 +3011,7 @@ begin
 	if ws_count = 0 then 
 		ws_erro := 'Cliente n&atilde;o est&aacute; habilitado para integra&ccedil;&atilde;o.'; 
 	else 
-		ctb.exec_run(prm_ID_RUN, prm_id_run_acao, ws_erro);
+		ctb.exec_run(prm_ID_RUN, prm_id_run_acao, prm_id_schedule, ws_erro);
 	end if; 	
 
 	if ws_erro is null then 
