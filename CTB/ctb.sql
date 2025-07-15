@@ -677,29 +677,26 @@ begin
                where ID_RUN = prm_ID_RUN 
 			     and id_schedule in ('0', prm_id_schedule)
                  and instr(upper(ws_comando), '$['||cd_parametro||']') > 0
+				and conteudo is not null 
 			  order by decode(id_schedule,prm_id_schedule,1,2)	 -- tenta substituir primeiro parametros do mesmo schedule, se não existir pega do padrão 0
              ) loop
 
-        ws_conteudo      := a.conteudo;
+		ws_conteudo      := a.conteudo;
 		ws_id_entreaspas := nvl(a.id_entreaspas,'N');
-        if ws_conteudo is null then
-            ws_erro := a.parametro; 
-            raise ws_raise_param;     
-        end if;
-        
-        if instr(upper(ws_conteudo),'EXEC=') > 0 then 
-            ws_conteudo := replace(ws_conteudo,'exec=','EXEC='); 
-            ws_conteudo := ctb.xexec (ws_conteudo); 
-        end if;  
-        if ws_id_entreaspas = 'S' then 
-            ws_conteudo := chr(39)||ws_conteudo||chr(39);
-        end if;    
-   
-        ws_comando := replace(ws_comando,  a.parametro, ws_conteudo );
-        if ws_parametros is not null then 
-            ws_parametros := ws_parametros||', ';
-        end if;     
-        ws_parametros := ws_parametros||a.parametro||'='||ws_conteudo;
+		
+		if instr(upper(ws_conteudo),'EXEC=') > 0 then 
+			ws_conteudo := replace(ws_conteudo,'exec=','EXEC='); 
+			ws_conteudo := ctb.xexec (ws_conteudo); 
+		end if;  
+		if ws_id_entreaspas = 'S' then 
+			ws_conteudo := chr(39)||ws_conteudo||chr(39);
+		end if;    
+
+		ws_comando := replace(ws_comando,  a.parametro, ws_conteudo );
+		if ws_parametros is not null then 
+			ws_parametros := ws_parametros||', ';
+		end if;     
+		ws_parametros := ws_parametros||a.parametro||'='||ws_conteudo;
     end loop; 
 
     prm_comando := ws_comando; 
